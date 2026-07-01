@@ -1,0 +1,33 @@
+services:
+  db:
+    image: postgres:16-bookworm
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-eureka}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-eureka}
+      POSTGRES_DB: ${POSTGRES_DB:-eureka_music}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-eureka} -d ${POSTGRES_DB:-eureka_music}"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  api:
+    build:
+      context: ./server
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://eureka:eureka@db:5432/eureka_music}
+      AUDIO_ROOT: ${AUDIO_ROOT:-/data/audio}
+    ports:
+      - "${API_PORT:-8000}:8000"
+    volumes:
+      - audio-data:/data/audio
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+  audio-data:
