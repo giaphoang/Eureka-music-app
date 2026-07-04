@@ -59,34 +59,187 @@ Expected:
 
 API documentation: `http://localhost:8000/docs`
 
-## 3. Seed the server with 100 FMA tracks
+## 3. Install FMA Small and seed data
 
-Expected local data layout:
+Download the dataset from the official FMA project: `https://github.com/mdeff/fma`.
+Only two archives are required for this starter:
 
-```text
-~/data/fma/
-├── fma_small/
-│   ├── 000/000002.mp3
-│   └── ...
-└── fma_metadata/
-    └── tracks.csv
+- `fma_metadata.zip`, which contains `fma_metadata/tracks.csv`
+- `fma_small.zip`, which contains the MP3 files
+
+The FMA folder can live next to this repository or anywhere else on your machine. The examples below use `$HOME/Documents/FMA`; if you choose another location, replace that path in each command.
+
+Create the dataset directory:
+
+```bash
+mkdir -p "$HOME/Documents/FMA"
+cd "$HOME/Documents/FMA"
+pwd
 ```
 
-Run:
+Expected:
+
+```text
+/Users/<your-username>/Documents/FMA
+```
+
+Download the metadata:
+
+```bash
+curl -L \
+  --fail \
+  --retry 5 \
+  --continue-at - \
+  -o fma_metadata.zip \
+  https://os.unil.cloud.switch.ch/fma/fma_metadata.zip
+```
+
+Download FMA Small:
+
+```bash
+curl -L \
+  --fail \
+  --retry 5 \
+  --continue-at - \
+  -o fma_small.zip \
+  https://os.unil.cloud.switch.ch/fma/fma_small.zip
+```
+
+Verify the downloads on macOS:
+
+```bash
+cd "$HOME/Documents/FMA"
+
+echo "f0df49ffe5f2a6008d7dc83c6915b31835dfe733  fma_metadata.zip" \
+  | shasum -a 1 -c -
+
+echo "ade154f733639d52e35e32f5593efe5be76c6d70  fma_small.zip" \
+  | shasum -a 1 -c -
+```
+
+Expected:
+
+```text
+fma_metadata.zip: OK
+fma_small.zip: OK
+```
+
+Unzip both archives:
+
+```bash
+cd "$HOME/Documents/FMA"
+unzip fma_metadata.zip
+unzip fma_small.zip
+```
+
+Expected file structure:
+
+```text
+~/Documents/
+├── FMA/
+│   ├── fma_small/
+│   │   ├── 000/
+│   │   ├── 001/
+│   │   └── ...
+│   └── fma_metadata/
+│       └── tracks.csv
+│
+└── eureka-music-starter/
+    ├── compose.yaml
+    ├── server/
+    │   └── scripts/
+    │       └── seed_fma.py
+    └── client/
+        └── scripts/
+            └── seed_fma.py
+```
+
+The path supplied to both seed scripts is the FMA parent directory, for example `$HOME/Documents/FMA`. Do not pass `fma_small/` or `fma_metadata/` directly.
+
+### Seed the server store
+
+The server seed script runs inside Docker, so it cannot directly access `/Users/<your-username>/Documents/FMA`. Mount the Mac folder into the container, then pass the mounted container path as the script CLI argument.
+
+From the repository root:
+
+```bash
+cd "$HOME/Documents/eureka-music-starter"
+```
+
+Verify the Docker mount first:
 
 ```bash
 docker compose run --rm \
-  -v "$HOME/data/fma:/fma:ro" \
-  api python scripts/seed_fma.py /fma --limit 100
+  -v "$HOME/Documents/FMA:/dataset/fma:ro" \
+  api sh -lc '
+    echo "CLI root would be: /dataset/fma"
+    test -d /dataset/fma/fma_small &&
+    echo "Found fma_small"
+
+    test -f /dataset/fma/fma_metadata/tracks.csv &&
+    echo "Found tracks.csv"
+
+    find /dataset/fma/fma_small -type f -name "*.mp3" | head
+  '
 ```
 
-Verify:
+Expected:
+
+```text
+Found fma_small
+Found tracks.csv
+/dataset/fma/fma_small/000/000002.mp3
+...
+```
+
+Then seed 100 tracks:
+
+```bash
+docker compose run --rm \
+  -v "$HOME/Documents/FMA:/dataset/fma:ro" \
+  api python -m scripts.seed_fma /dataset/fma --limit 100
+```
+
+The important part is `python -m scripts.seed_fma /dataset/fma --limit 100`. `/dataset/fma` is the CLI argument received by the server script inside Docker, and the volume mapping only makes the Mac folder available there:
+
+```text
+Mac:       $HOME/Documents/FMA
+Container: /dataset/fma
+```
+
+Inside Docker, the script resolves:
+
+```text
+/dataset/fma/fma_small
+/dataset/fma/fma_metadata/tracks.csv
+```
+
+Verify the seeded server catalog:
 
 ```bash
 curl 'http://localhost:8000/api/v1/tracks?limit=3'
 ```
 
-For final testing, rerun without `--limit`. The script is idempotent and skips existing tracks.
+For final testing, rerun the seed command without `--limit`. The server script is idempotent and skips existing tracks.
+
+### Seed the client store
+
+The client seed script runs directly on macOS, so pass the Mac filesystem path:
+
+```bash
+cd "$HOME/Documents/eureka-music-starter/client"
+source .venv/bin/activate
+python scripts/seed_fma.py "$HOME/Documents/FMA" --limit 100
+```
+
+For final testing, rerun without `--limit`.
+
+Both scripts receive the same logical FMA parent directory, but expressed in the filesystem of the environment where each script runs:
+
+```text
+Server Docker CLI argument: /dataset/fma
+Client macOS CLI argument:  /Users/<your-username>/Documents/FMA
+```
 
 ## 4. Start the desktop client
 
@@ -120,20 +273,7 @@ cd client
 7. Restart the client and confirm downloads and playlists remain.
 8. Run `docker compose down`, then `docker compose up -d`, and confirm the server catalog remains.
 
-## 6. Optional: seed the client directly
-
-This is useful for stress-testing startup and local browsing without downloading 8,000 tracks over HTTP:
-
-```bash
-cd client
-source .venv/bin/activate
-python scripts/seed_fma.py "$HOME/data/fma" --limit 100
-python -m eureka_client.app
-```
-
-Remove `--limit` for all 8,000 tracks.
-
-## 7. Reset local state
+## 6. Reset local state
 
 Server database and audio:
 
@@ -149,7 +289,7 @@ rm -rf "$HOME/Library/Application Support/EurekaMusic"
 
 Or set `EUREKA_DATA_DIR` to a repository-local path during development.
 
-## 8. Recommended five-day build order
+## 7. Recommended five-day build order
 
 - **Day 1:** architecture, Compose, schema, catalog/search, server seed.
 - **Day 2:** client shell, SQLite, catalog browsing, background workers, downloads.
@@ -175,6 +315,6 @@ python -m eureka_client.app
 
 Run the complete 8,000-track test on Ubuntu before recording the submission video.
 
-## 9. Before submission
+## 8. Before submission
 
 This starter intentionally favors clarity. Before submitting, add Alembic migrations, structured logging, API integration tests, Qt model tests, and a CI job that runs server tests and static checks.
