@@ -22,3 +22,58 @@ def test_playlist_order(tmp_path: Path) -> None:
     db.add_to_playlist(playlist_id, 2)
     db.move_playlist_item(playlist_id, 2, -1)
     assert [row["server_id"] for row in db.list_playlist_tracks(playlist_id)] == [2, 1]
+
+
+def test_playlist_duplicate_remove_and_restart_persistence(tmp_path: Path) -> None:
+    db_path = tmp_path / "test.sqlite3"
+    db = ClientDB(db_path)
+    for track_id in (1, 2, 3):
+        db.upsert_download(
+            {
+                "id": track_id,
+                "title": f"Track {track_id}",
+                "artist": "Artist",
+                "album": None,
+                "genre": None,
+                "duration_ms": 30_000,
+            },
+            str(tmp_path / f"{track_id}.mp3"),
+        )
+
+    playlist_id = db.create_playlist("Manual")
+    db.add_to_playlist(playlist_id, 1)
+    db.add_to_playlist(playlist_id, 2)
+    db.add_to_playlist(playlist_id, 2)
+    db.add_to_playlist(playlist_id, 3)
+    assert [row["server_id"] for row in db.list_playlist_tracks(playlist_id)] == [1, 2, 3]
+
+    db.remove_from_playlist(playlist_id, 2)
+    assert [
+        (row["server_id"], row["position"]) for row in db.list_playlist_tracks(playlist_id)
+    ] == [(1, 0), (3, 1)]
+
+    db.move_playlist_item(playlist_id, 1, 1)
+    restarted = ClientDB(db_path)
+    assert [row["server_id"] for row in restarted.list_playlist_tracks(playlist_id)] == [3, 1]
+
+
+def test_empty_and_one_track_playlist(tmp_path: Path) -> None:
+    db = ClientDB(tmp_path / "test.sqlite3")
+    playlist_id = db.create_playlist("Sparse")
+    assert db.list_playlist_tracks(playlist_id) == []
+
+    db.upsert_download(
+        {
+            "id": 1,
+            "title": "Only Track",
+            "artist": "Artist",
+            "album": None,
+            "genre": None,
+            "duration_ms": 30_000,
+        },
+        str(tmp_path / "1.mp3"),
+    )
+    db.add_to_playlist(playlist_id, 1)
+    db.move_playlist_item(playlist_id, 1, -1)
+    db.move_playlist_item(playlist_id, 1, 1)
+    assert [row["server_id"] for row in db.list_playlist_tracks(playlist_id)] == [1]
