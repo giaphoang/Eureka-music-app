@@ -2,10 +2,13 @@
 import argparse
 import hashlib
 import shutil
+import sys
 from pathlib import Path
 
 import pandas as pd
 from sqlalchemy import select
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.config import settings
 from app.database import Base, SessionLocal, engine
