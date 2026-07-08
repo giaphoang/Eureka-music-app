@@ -16,13 +16,14 @@ class PlaybackController(QObject):
 
     def __init__(self) -> None:
         super().__init__()
-        self.player = QMediaPlayer(None, QMediaPlayer.StreamPlayback)
+        self.player = QMediaPlayer(self, QMediaPlayer.StreamPlayback)
         self.queue: list[dict] = []
         self.index = -1
         self.order: list[int] = []
         self.order_position = -1
         self.shuffle = False
         self.loop_mode = "off"
+        self._shutdown = False
 
         self.player.positionChanged.connect(self._forward_position_changed)
         self.player.durationChanged.connect(self._forward_duration_changed)
@@ -31,22 +32,36 @@ class PlaybackController(QObject):
         self.player.error.connect(self._on_error)
 
     def _forward_position_changed(self, position: int) -> None:
+        if self._shutdown:
+            return
         self.position_changed.emit(int(position))
 
     def _forward_duration_changed(self, duration: int) -> None:
+        if self._shutdown:
+            return
         self.duration_changed.emit(int(duration))
 
     def _forward_state_changed(self, state: QMediaPlayer.State) -> None:
+        if self._shutdown:
+            return
         self.state_changed.emit(int(state))
 
     def set_queue(self, tracks: list[dict], start_index: int = 0) -> None:
+        if self._shutdown:
+            return
         selected = tracks[start_index] if tracks and 0 <= start_index < len(tracks) else None
+        if selected is not None:
+            selected_path = Path(selected["local_path"])
+            if not selected_path.is_file():
+                self.stop()
+                self._clear_queue()
+                self._emit_error(f"Local audio file is missing: {selected_path}")
+                return
+
         self.queue = [track for track in tracks if Path(track["local_path"]).is_file()]
         if not self.queue:
             self.stop()
-            self.index = -1
-            self.order = []
-            self.order_position = -1
+            self._clear_queue()
             return
 
         selected_index = 0
@@ -61,7 +76,18 @@ class PlaybackController(QObject):
         self._rebuild_order(selected_index)
         self._load_current(autoplay=True)
 
+    def _clear_queue(self) -> None:
+        self.queue = []
+        self.index = -1
+        self.order = []
+        self.order_position = -1
+
+    def _emit_error(self, message: str) -> None:
+        self.error.emit(message)
+
     def set_shuffle(self, enabled: bool) -> None:
+        if self._shutdown:
+            return
         enabled = bool(enabled)
         if self.shuffle == enabled:
             return
@@ -73,18 +99,26 @@ class PlaybackController(QObject):
         self.set_queue([track], 0)
 
     def toggle(self) -> None:
+        if self._shutdown:
+            return
         if self.player.state() == QMediaPlayer.PlayingState:
             self.player.pause()
         elif self.index >= 0:
             self.player.play()
 
     def stop(self) -> None:
+        if self._shutdown:
+            return
         self.player.stop()
 
     def seek(self, position_ms: int) -> None:
+        if self._shutdown:
+            return
         self.player.setPosition(max(0, position_ms))
 
     def next(self) -> None:
+        if self._shutdown:
+            return
         if not self.queue:
             return
         if self.order_position + 1 < len(self.order):
@@ -99,6 +133,8 @@ class PlaybackController(QObject):
         self._load_current(autoplay=True)
 
     def previous(self) -> None:
+        if self._shutdown:
+            return
         if not self.queue:
             return
         if self.player.position() > 3_000:
@@ -133,6 +169,8 @@ class PlaybackController(QObject):
         self.index = start_index
 
     def _load_current(self, autoplay: bool) -> None:
+        if self._shutdown:
+            return
         track = self.queue[self.index]
         url = QUrl.fromLocalFile(str(Path(track["local_path"]).resolve()))
         self.player.setMedia(QMediaContent(url))
@@ -141,6 +179,8 @@ class PlaybackController(QObject):
             self.player.play()
 
     def _on_media_status(self, status: QMediaPlayer.MediaStatus) -> None:
+        if self._shutdown:
+            return
         if status == QMediaPlayer.EndOfMedia:
             if self.loop_mode == "one":
                 self.player.setPosition(0)
@@ -149,4 +189,19 @@ class PlaybackController(QObject):
                 self.next()
 
     def _on_error(self, *_: object) -> None:
+        if self._shutdown:
+            return
         self.error.emit(self.player.errorString() or "Audio playback error")
+
+    def shutdown(self) -> None:
+        if self._shutdown:
+            return
+        self._shutdown = True
+        self._clear_queue()
+
+        try:
+            self.player.stop()
+            self.player.setMedia(QMediaContent())
+            self.player.deleteLater()
+        except RuntimeError:
+            pass

@@ -94,6 +94,36 @@ class ClientDB:
             ).fetchall()
         return [dict(row) for row in rows]
 
+    def prune_missing_downloads(self) -> int:
+        with self.connect() as conn:
+            rows = conn.execute("SELECT server_id, local_path FROM downloaded_tracks").fetchall()
+            missing_ids = [
+                int(row["server_id"])
+                for row in rows
+                if not Path(row["local_path"]).is_file()
+            ]
+            if not missing_ids:
+                return 0
+
+            playlist_ids = [
+                int(row[0])
+                for row in conn.execute(
+                    f"""
+                    SELECT DISTINCT playlist_id
+                    FROM playlist_items
+                    WHERE track_id IN ({",".join("?" for _ in missing_ids)})
+                    """,
+                    missing_ids,
+                ).fetchall()
+            ]
+            conn.executemany(
+                "DELETE FROM downloaded_tracks WHERE server_id=?",
+                [(track_id,) for track_id in missing_ids],
+            )
+            for playlist_id in playlist_ids:
+                self._normalize_positions(conn, playlist_id)
+            return len(missing_ids)
+
     def create_playlist(self, name: str) -> int:
         with self.connect() as conn:
             cursor = conn.execute("INSERT INTO playlists(name) VALUES (?)", (name.strip(),))
@@ -112,16 +142,17 @@ class ClientDB:
             ).fetchall()
         return [dict(row) for row in rows]
 
-    def add_to_playlist(self, playlist_id: int, track_id: int) -> None:
+    def add_to_playlist(self, playlist_id: int, track_id: int) -> bool:
         with self.connect() as conn:
             position = conn.execute(
                 "SELECT COALESCE(MAX(position), -1) + 1 FROM playlist_items WHERE playlist_id=?",
                 (playlist_id,),
             ).fetchone()[0]
-            conn.execute(
+            cursor = conn.execute(
                 "INSERT OR IGNORE INTO playlist_items(playlist_id, track_id, position) VALUES (?, ?, ?)",
                 (playlist_id, track_id, position),
             )
+            return cursor.rowcount > 0
 
     def list_playlist_tracks(self, playlist_id: int) -> list[dict]:
         with self.connect() as conn:

@@ -28,8 +28,11 @@ class Task(QRunnable):
             if "progress" in self.function.__code__.co_varnames:
                 self.kwargs["progress"] = self.signals.progress.emit
             result = self.function(*self.args, **self.kwargs)
-        except Exception:
-            self.signals.error.emit(traceback.format_exc())
+        except Exception as exc:
+            if getattr(exc, "user_visible", False):
+                self.signals.error.emit(str(exc))
+            else:
+                self.signals.error.emit(traceback.format_exc())
         else:
             self.signals.result.emit(result)
         finally:

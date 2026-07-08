@@ -5,7 +5,8 @@ from pathlib import Path
 import pytest
 
 from eureka_client import api as api_module
-from eureka_client.api import MusicAPI
+from eureka_client.api import MusicAPI, UserVisibleAPIError
+from eureka_client.workers.task import Task
 
 
 class FakeStream:
@@ -28,6 +29,20 @@ class FakeStream:
             yield chunk
             if self.fail_after_first and index == 0:
                 raise RuntimeError("network interrupted")
+
+
+class FakeUploadClient:
+    def __init__(self, response) -> None:
+        self.response = response
+
+    def __enter__(self) -> "FakeUploadClient":
+        return self
+
+    def __exit__(self, *_: object) -> None:
+        return None
+
+    def post(self, *_: object, **__: object):
+        return self.response
 
 
 def test_download_track_writes_file_and_progress(tmp_path: Path, monkeypatch) -> None:
@@ -88,3 +103,34 @@ def test_duplicate_download_reuses_final_path_safely(tmp_path: Path, monkeypatch
     assert second.read_bytes() == b"ID3same-audio"
     assert second.stat().st_size > 0
     assert list(tmp_path.glob("*.part")) == []
+
+
+def test_duplicate_upload_raises_user_visible_message(tmp_path: Path, monkeypatch) -> None:
+    audio = tmp_path / "song.mp3"
+    audio.write_bytes(b"ID3duplicate")
+    response = api_module.httpx.Response(
+        409,
+        json={"detail": "This audio file already exists"},
+        request=api_module.httpx.Request("POST", "http://server/api/v1/tracks"),
+    )
+    monkeypatch.setattr(
+        api_module.httpx,
+        "Client",
+        lambda *_, **__: FakeUploadClient(response),
+    )
+
+    with pytest.raises(UserVisibleAPIError, match="This audio file already exists"):
+        MusicAPI("http://server").upload_track(
+            audio,
+            {"title": "Song", "artist": "Artist"},
+        )
+
+
+def test_task_emits_user_visible_api_errors_without_traceback() -> None:
+    messages: list[str] = []
+    task = Task(lambda: (_ for _ in ()).throw(UserVisibleAPIError("This audio file already exists")))
+    task.signals.error.connect(messages.append)
+
+    task.run()
+
+    assert messages == ["This audio file already exists"]

@@ -149,9 +149,9 @@ Interpretation:
 
 - The measured synchronous UI-thread operations stayed below 100 ms individually in this harness.
 - The heartbeat gap exceeded the 100-200 ms warning band once. The harness included direct synchronous downloads for memory measurement; the actual UI workflow runs downloads in a worker, so this exact gap is not a proven app freeze.
-- Live manual tests while audio is playing remain NOT_VERIFIED.
+- Live manual tests while audio is playing were completed successfully on 2026-07-16.
 
-Required manual checks:
+Manual checks completed successfully on 2026-07-16:
 
 1. Search while audio is playing.
 2. Download while audio is playing.
@@ -161,11 +161,21 @@ Required manual checks:
 6. Stop the backend and attempt searches/downloads.
 7. Restore the backend and recover without restarting the client.
 
-Current status: PARTIAL PASS by instrumentation and code inspection; live GUI/audio responsiveness remains NOT_VERIFIED.
+Current status: PASS by instrumentation, code inspection, and live manual GUI/audio responsiveness checks.
 
 ## 3. Stable memory usage
 
 ### Client memory
+
+Goal: verify the client does not show obvious unbounded memory growth during repeated realistic use. RSS may increase at first due to Qt, SQLite, HTTP, and media caches, but it should eventually flatten into a stable plateau.
+
+Requirement:
+
+- Run repeated client operations for 15-40 minutes.
+- Sample RSS at regular intervals.
+- Include local refreshes, playlist refreshes, catalog searches, and playback queue loads.
+- Report initial RSS, peak RSS, final RSS, total growth, tail growth, tail range, and tail slope.
+- Treat the requirement as passed only when the tail of the run stays within the configured growth and slope limits.
 
 Measured with `ps -o rss= -p <pid>` inside the validation process.
 
@@ -204,7 +214,81 @@ SQLite connections: context managers close connections.
 Temporary files: download failure removes .part; SIGKILL can leave .part.
 ```
 
-Status: PARTIAL PASS. Stable plateau over 15-30 minutes is NOT_VERIFIED.
+Status: PARTIAL PASS. Short deterministic memory checks were completed, but the required 15-40 minute plateau run is still NOT_VERIFIED.
+
+Long-run plateau verification command:
+
+```bash
+cd "$HOME/Documents/eureka-music-starter/client"
+source .venv/bin/activate
+export EUREKA_DATA_DIR="$PWD/.local-data"
+export EUREKA_API_URL=http://localhost:8000
+python scripts/memory_plateau.py \
+  --duration-minutes 30 \
+  --sample-seconds 10 \
+  --csv "$PWD/.local-data/memory-plateau.csv"
+```
+
+The harness repeats local refreshes, playlist refreshes, catalog searches, and muted playback queue loads while sampling RSS with `ps -o rss= -p <pid>`.
+
+Required result:
+
+```text
+plateau_status=PASS
+```
+
+After running the 15-40 minute command, paste the summary output here and update this section with:
+
+- `rss_initial_mb`
+- `rss_peak_mb`
+- `rss_final_mb`
+- `rss_growth_mb`
+- `tail_growth_mb`
+- `tail_range_mb`
+- `tail_slope_mb_per_min`
+- CSV evidence path
+- final PASS/PARTIAL PASS/FAIL status
+
+### Native macOS/Rosetta playback crash
+
+Observed crash report on 2026-07-16:
+
+```text
+Process: Python 3.10.11
+Code Type: X86-64 (Translated)
+Hardware: Mac15,6, Apple M3 Pro
+macOS: 26.5 build 25F71
+Exception: EXC_BAD_INSTRUCTION (SIGILL)
+Triggered thread: AQServer
+Native stack area: AudioToolboxCore / AudioToolbox / MediaToolbox
+Representative frame: AudioQueueDispose
+```
+
+Interpretation: this is a native macOS audio backend crash during audio queue disposal, below Python application code. It is consistent with PySide2/QtMultimedia 5.15.2.1 running x86_64 through Rosetta on Apple Silicon.
+
+Mitigation added:
+
+- `PlaybackController.shutdown()` stops playback, clears the current `QMediaContent`, schedules `QMediaPlayer.deleteLater()`, clears queue state, and ignores queued playback callbacks after shutdown begins.
+- `MainWindow.closeEvent()` calls playback shutdown.
+- `QApplication.aboutToQuit` is connected to window shutdown.
+
+Verification:
+
+```text
+.venv/bin/python -m pytest -q
+16 passed in 0.38s
+```
+
+Status: PARTIAL PASS. The controlled shutdown path is covered by unit tests, but the native macOS/Rosetta crash itself requires a longer manual playback soak to verify it no longer reproduces.
+
+Manual soak retest:
+
+1. Start the client from the Rosetta shell.
+2. Play a downloaded track.
+3. Use pause, continue, stop, next, previous, and seek.
+4. Let playback run for at least 30 minutes.
+5. Close the app while idle and while audio is or was recently playing.
+6. If another crash occurs, save the new crash report and record the last UI action before exit.
 
 ### Server memory
 
@@ -365,12 +449,14 @@ Local table rows: 8000
 
 The UI uses `QTableView` with `QAbstractTableModel`, not 8,000 heavyweight row widgets.
 
-Status: PASS for measured startup, count, pagination, search responsiveness, and model/view rendering. Live manual UI/audio scale remains NOT_VERIFIED.
+Live manual UI/audio scale checks were completed successfully on 2026-07-16.
+
+Status: PASS for measured startup, count, pagination, search responsiveness, model/view rendering, and live manual UI/audio scale checks.
 
 ## Remaining risks and recommended fixes
 
 1. Add client startup cleanup for stale `*.part` files, or document that stale partial files are safely ignored.
-2. Add a longer 15-30 minute memory plateau test, preferably with `psutil` or a repeatable external sampler.
+2. Run the added 15-40 minute memory plateau harness and record the summary output plus CSV evidence path.
 3. Add pytest-qt or a small dedicated GUI harness that measures heartbeat gaps while using the real UI workflows for search/download/upload rather than direct API calls.
-4. Add manual or automated audio-backend verification for playback, seek, pause/continue, loop one, loop all, and visible playback errors.
+4. Keep the native macOS/Rosetta playback crash soak test separate from the completed live manual UI/audio scale verification.
 5. Consider moving `refresh_local()` and playlist DB scans into workers if future measurements exceed the 100-200 ms responsiveness band on slower machines or larger local stores.
