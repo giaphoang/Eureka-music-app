@@ -1,0 +1,224 @@
+#AppRoot {
+    background: #000000;
+}
+
+#Sidebar {
+    background: #000000;
+    border-right: 1px solid #2A2A2A;
+}
+
+#TopBar {
+    background: #121212;
+    border-bottom: 1px solid #2A2A2A;
+}
+
+#MainSurface {
+    background: #121212;
+}
+
+#QueuePanel {
+    background: #181818;
+    border-left: 1px solid #2A2A2A;
+}
+
+#PlayerBar {
+    background: #181818;
+    border-top: 1px solid #2A2A2A;
+}
+
+#Toast {
+    background: #242424;
+    color: #FFFFFF;
+    border: 1px solid #2A2A2A;
+    border-radius: 6px;
+    padding: 10px 12px;
+}
+
+#Toast[kind="success"] {
+    border-color: #1ED760;
+}
+
+#Toast[kind="error"] {
+    border-color: #E35D6A;
+}
+
+#NowPlayingArtwork {
+    background: #303030;
+    color: #FFFFFF;
+    min-width: 56px;
+    max-width: 56px;
+    min-height: 56px;
+    max-height: 56px;
+    border-radius: 6px;
+    font-weight: 700;
+}
+
+#SearchInput {
+    background: #242424;
+    color: #FFFFFF;
+    border: 1px solid #303030;
+    border-radius: 16px;
+    padding: 7px 14px;
+    min-width: 260px;
+}
+
+#SearchInput:focus {
+    border-color: #FFFFFF;
+}
+
+#TrackTable {
+    background: #121212;
+    color: #FFFFFF;
+    alternate-background-color: #181818;
+    selection-background-color: #303030;
+    selection-color: #FFFFFF;
+    border: 1px solid #2A2A2A;
+}
+
+#TrackTable::item {
+    padding: 6px;
+}
+
+#TrackTable::item:hover {
+    background: #242424;
+}
+
+#SidebarPlaylistList {
+    background: #000000;
+    color: #B3B3B3;
+    border: none;
+    selection-background-color: #242424;
+    selection-color: #FFFFFF;
+}
+
+QHeaderView::section {
+    background: #181818;
+    color: #B3B3B3;
+    border: none;
+    border-bottom: 1px solid #2A2A2A;
+    padding: 7px;
+}
+
+QLabel {
+    color: #FFFFFF;
+}
+
+QLabel[role="secondary"],
+QLabel[role="sectionLabel"] {
+    color: #B3B3B3;
+}
+
+QLabel[role="brand"] {
+    color: #FFFFFF;
+    font-size: 20px;
+    font-weight: 700;
+    padding: 4px 4px 12px 4px;
+}
+
+QLabel[role="pageTitle"] {
+    color: #FFFFFF;
+    font-size: 22px;
+    font-weight: 700;
+}
+
+QLabel[role="sectionTitle"],
+QLabel[role="emptyTitle"],
+QLabel[role="nowTitle"] {
+    color: #FFFFFF;
+    font-weight: 700;
+}
+
+QPushButton,
+QToolButton {
+    background: #242424;
+    color: #FFFFFF;
+    border: 1px solid #303030;
+    border-radius: 5px;
+    padding: 7px 10px;
+}
+
+QPushButton:hover,
+QToolButton:hover {
+    background: #303030;
+}
+
+QPushButton:disabled,
+QToolButton:disabled {
+    color: #727272;
+    background: #181818;
+}
+
+QPushButton:focus,
+QToolButton:focus,
+QLineEdit:focus,
+QTableView:focus,
+QListWidget:focus {
+    border: 1px solid #FFFFFF;
+}
+
+QPushButton[role="primary"] {
+    background: #1ED760;
+    color: #000000;
+    border: 1px solid #1ED760;
+    font-weight: 700;
+}
+
+QPushButton[role="primary"]:hover {
+    background: #3BE477;
+}
+
+QPushButton[role="nav"] {
+    background: transparent;
+    color: #B3B3B3;
+    border: none;
+    text-align: left;
+    padding: 9px 8px;
+}
+
+QPushButton[role="nav"]:hover,
+QPushButton[role="nav"]:checked {
+    background: #242424;
+    color: #FFFFFF;
+}
+
+QPushButton[role="icon"],
+QToolButton[role="icon"] {
+    min-width: 32px;
+    max-width: 32px;
+    min-height: 32px;
+    max-height: 32px;
+    padding: 4px;
+}
+
+QLineEdit {
+    background: #181818;
+    color: #FFFFFF;
+    border: 1px solid #303030;
+    border-radius: 5px;
+    padding: 7px;
+}
+
+QProgressBar {
+    background: #242424;
+    color: #FFFFFF;
+    border: 1px solid #303030;
+    border-radius: 5px;
+    text-align: center;
+}
+
+QProgressBar::chunk {
+    background: #1ED760;
+}
+
+QSlider::groove:horizontal {
+    background: #303030;
+    height: 4px;
+    border-radius: 2px;
+}
+
+QSlider::handle:horizontal {
+    background: #FFFFFF;
+    width: 12px;
+    margin: -5px 0;
+    border-radius: 6px;
+}
