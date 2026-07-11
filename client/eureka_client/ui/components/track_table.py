@@ -43,6 +43,8 @@ class TrackTableModel(QAbstractTableModel):
 
 
 class TrackTable(QTableView):
+    track_clicked = Signal(dict)
+    row_clicked = Signal(int)
     track_activated = Signal(dict)
     row_activated = Signal(int)
 
@@ -57,6 +59,7 @@ class TrackTable(QTableView):
         self.setAlternatingRowColors(False)
         self.setSortingEnabled(False)
         self.setShowGrid(False)
+        self.clicked.connect(self._click_index)
         self.doubleClicked.connect(self._activate_index)
         header = self.horizontalHeader()
         header.setSectionResizeMode(0, QHeaderView.Stretch)
@@ -93,3 +96,11 @@ class TrackTable(QTableView):
         if 0 <= row < len(self.model_data.tracks):
             self.row_activated.emit(row)
             self.track_activated.emit(self.model_data.tracks[row])
+
+    def _click_index(self, index: QModelIndex) -> None:
+        if not index.isValid():
+            return
+        row = index.row()
+        if 0 <= row < len(self.model_data.tracks):
+            self.row_clicked.emit(row)
+            self.track_clicked.emit(self.model_data.tracks[row])

@@ -119,9 +119,9 @@ class MainWindow(QMainWindow):
         self.browse_page.previous_page_requested.connect(self.previous_catalog_page)
         self.browse_page.next_page_requested.connect(self.next_catalog_page)
 
-        self.downloads_page.play_requested.connect(self.play_local_selected)
         self.downloads_page.add_to_playlist_requested.connect(self.add_local_to_playlist)
         self.downloads_page.refresh_requested.connect(self.refresh_local)
+        self.downloads_page.table.track_clicked.connect(self.play_track_from_downloads)
         self.downloads_page.table.track_activated.connect(self.play_track_from_downloads)
 
         self.playlist_page.create_requested.connect(self.create_playlist)
@@ -276,11 +276,6 @@ class MainWindow(QMainWindow):
             self.toast.show_message(f"Removed {removed} missing local file(s).", "info")
         self.local_tracks = self.db.list_downloads()
         self.downloads_page.set_tracks(self.local_tracks)
-
-    def play_local_selected(self) -> None:
-        track = self.downloads_page.selected_track()
-        if track:
-            self.play_track_from_downloads(track)
 
     def play_track_from_downloads(self, track: dict) -> None:
         index = self.local_tracks.index(track)

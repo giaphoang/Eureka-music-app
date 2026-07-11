@@ -8,7 +8,6 @@ from eureka_client.ui.components.track_table import TrackTable
 
 
 class DownloadsPage(QWidget):
-    play_requested = Signal()
     add_to_playlist_requested = Signal()
     refresh_requested = Signal()
 
@@ -21,14 +20,10 @@ class DownloadsPage(QWidget):
         self.empty = EmptyState("No downloads yet", "Download tracks from Browse to play them offline.")
 
         controls = QHBoxLayout()
-        play = QPushButton("Play selected")
-        play.setProperty("role", "primary")
-        play.clicked.connect(self.play_requested)
         add = QPushButton("Add to playlist")
         add.clicked.connect(self.add_to_playlist_requested)
         refresh = QPushButton("Refresh")
         refresh.clicked.connect(self.refresh_requested)
-        controls.addWidget(play)
         controls.addWidget(add)
         controls.addStretch()
         controls.addWidget(refresh)

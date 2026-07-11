@@ -4,11 +4,13 @@ import os
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PySide2.QtWidgets import QApplication, QLabel
+from PySide2.QtWidgets import QApplication, QLabel, QPushButton
 
 from eureka_client.ui.components.player_bar import PlayerBar
 from eureka_client.ui.components.queue_panel import QueuePanel
 from eureka_client.ui.components.sidebar import Sidebar
+from eureka_client.ui.components.track_table import TrackTable
+from eureka_client.ui.pages.downloads_page import DownloadsPage
 
 
 def app() -> QApplication:
@@ -74,3 +76,35 @@ def test_queue_panel_uses_model_view_for_large_queue() -> None:
     assert panel.table.model_data.rowCount() == 8000
     assert panel.table.selected_row() == 42
     assert len(panel.findChildren(QLabel)) < 10
+
+
+def test_track_table_click_and_activation_are_separate_signals() -> None:
+    app()
+    table = TrackTable()
+    track = {"server_id": 1, "title": "Song", "artist": "Artist"}
+    clicked: list[dict] = []
+    activated: list[dict] = []
+    table.track_clicked.connect(clicked.append)
+    table.track_activated.connect(activated.append)
+    table.set_tracks([track])
+    index = table.model_data.index(0, 0)
+
+    table._click_index(index)
+
+    assert clicked == [track]
+    assert activated == []
+
+    table._activate_index(index)
+
+    assert activated == [track]
+
+
+def test_downloads_page_has_no_play_selected_button() -> None:
+    app()
+    page = DownloadsPage()
+
+    button_texts = [button.text() for button in page.findChildren(QPushButton)]
+
+    assert "Play selected" not in button_texts
+    assert "Add to playlist" in button_texts
+    assert "Refresh" in button_texts
