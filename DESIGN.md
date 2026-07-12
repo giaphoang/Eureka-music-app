@@ -131,6 +131,29 @@ flowchart LR
     Signals --> UI[Update slider, label, button]
 ```
 
+## Desktop UI shell
+
+The client presentation layer is organized as a reusable PySide2 shell:
+
+```mermaid
+flowchart LR
+    MainWindow --> Sidebar
+    MainWindow --> TopBar
+    MainWindow --> Stack[QStackedWidget]
+    Stack --> BrowsePage
+    Stack --> DownloadsPage
+    Stack --> PlaylistPage
+    Stack --> UploadPage
+    MainWindow --> QueuePanel
+    MainWindow --> PlayerBar
+```
+
+`MainWindow` remains the orchestration boundary. It owns `MusicAPI`, `ClientDB`, `PlaybackController`, `QThreadPool`, navigation state, selected playlist state, and the current playback queue.
+
+Pages and components own presentation only. They emit Qt signals for user intent and do not perform direct HTTP or SQLite business logic.
+
+Large music collections continue to use `QTableView` with `QAbstractTableModel`. The refactor does not create one widget per track and does not load remote artwork at startup.
+
 ## API choice
 
 REST is sufficient because the required interactions are request/response operations. JSON is used for catalog metadata; multipart/form-data is used for uploads; `FileResponse` streams downloads. WebSocket or SSE would add lifecycle and reconnection complexity without a real-time requirement.

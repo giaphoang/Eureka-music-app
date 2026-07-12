@@ -453,6 +453,35 @@ Live manual UI/audio scale checks were completed successfully on 2026-07-16.
 
 Status: PASS for measured startup, count, pagination, search responsiveness, model/view rendering, and live manual UI/audio scale checks.
 
+## 6. Spotify-inspired UI refactor validation
+
+The refactored client shell was validated separately under:
+
+```text
+docs/ui-refactor/
+```
+
+Key refactor measurements:
+
+```text
+startup_median_before=0.198235s
+startup_max_before=0.590127s
+startup_median_after=0.226284s
+startup_max_after=0.236121s
+rss_median_before=101.6MB
+rss_median_after=106.9MB
+memory_plateau_15_min=PASS
+```
+
+Evidence:
+
+```text
+docs/ui-refactor/BASELINE.md
+docs/ui-refactor/PERFORMANCE_COMPARISON.md
+docs/ui-refactor/REGRESSION_REPORT.md
+docs/ui-refactor/memory-plateau-refactor.csv
+```
+
 ## Remaining risks and recommended fixes
 
 1. Add client startup cleanup for stale `*.part` files, or document that stale partial files are safely ignored.
