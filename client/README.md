@@ -2,7 +2,9 @@
 
 ## Important for Apple Silicon Macs
 
-PySide2 5.15.2.1 only publishes an Intel macOS wheel. Use Python 3.10 in an x86_64/Rosetta shell. The server may continue running natively in Docker Desktop.
+PySide2 5.15.2.1 on macOS supports Intel x86_64, not Apple Silicon arm64/aarch64. On an Apple Silicon Mac, Python normally runs as arm64, but the available PySide2 macOS wheel was compiled for x86_64. Because those architectures do not match, pip reports that no compatible version exists.
+
+Run an Intel shell through Rosetta first, then create the virtual environment inside that shell. The server may continue running natively in Docker Desktop.
 
 Install the official Python 3.10.11 **macOS universal2** package. Its default binary is:
 
@@ -22,6 +24,7 @@ arch -x86_64 "$PY310" -c 'import platform; print(platform.machine())'
 Create and run the client environment:
 
 ```bash
+arch -x86_64 zsh
 cd client
 ./scripts/bootstrap_macos.sh
 ./scripts/run_macos.sh
