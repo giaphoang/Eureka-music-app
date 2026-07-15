@@ -92,7 +92,10 @@ For final testing, rerun without `--limit`. The script is idempotent and skips e
 
 ### Apple Silicon
 
+PySide2 5.15.2.1 requires the desktop client to run in an Intel x86_64/Rosetta shell. See `client/README.md` for the full Apple Silicon setup notes.
+
 ```bash
+arch -x86_64 zsh
 cd client
 ./scripts/bootstrap_macos.sh
 ./scripts/run_macos.sh
