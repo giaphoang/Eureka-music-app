@@ -8,6 +8,26 @@ import httpx
 from eureka_client.config import API_BASE_URL, DOWNLOAD_DIR, ensure_dirs
 
 
+class UserVisibleAPIError(RuntimeError):
+    user_visible = True
+
+
+def raise_for_api_status(response: httpx.Response) -> None:
+    try:
+        response.raise_for_status()
+    except httpx.HTTPStatusError as exc:
+        detail = None
+        try:
+            payload = response.json()
+            if isinstance(payload, dict):
+                detail = payload.get("detail")
+        except ValueError:
+            pass
+        if detail:
+            raise UserVisibleAPIError(str(detail)) from exc
+        raise
+
+
 class MusicAPI:
     def __init__(self, base_url: str = API_BASE_URL) -> None:
         self.base_url = base_url.rstrip("/")
@@ -61,5 +81,5 @@ class MusicAPI:
                 data={key: value for key, value in metadata.items() if value not in (None, "")},
                 files={"audio": (file_path.name, audio, content_type)},
             )
-            response.raise_for_status()
+            raise_for_api_status(response)
             return response.json()

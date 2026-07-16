@@ -11,6 +11,7 @@ def main() -> int:
     app = QApplication(sys.argv)
     app.setApplicationName("Eureka Music")
     window = MainWindow()
+    app.aboutToQuit.connect(window.shutdown)
     window.show()
     return app.exec_()
 

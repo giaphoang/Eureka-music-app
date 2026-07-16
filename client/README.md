@@ -51,6 +51,25 @@ python scripts/seed_fma.py "$HOME/data/fma" --limit 100
 
 Remove `--limit 100` to seed all 8,000 tracks.
 
+## Memory plateau validation
+
+The long memory test repeats local refreshes, playlist refreshes, catalog searches, and muted playback queue loads while sampling RSS with `ps`.
+
+Run it against a seeded client store for 15-40 minutes:
+
+```bash
+export EUREKA_DATA_DIR="$PWD/.local-data"
+export EUREKA_API_URL=http://localhost:8000
+python scripts/memory_plateau.py \
+  --duration-minutes 30 \
+  --sample-seconds 10 \
+  --csv "$PWD/.local-data/memory-plateau.csv"
+```
+
+Use `--visible` to show the real window during the run. By default the harness uses Qt offscreen mode.
+
+The result is acceptable when the summary reports `plateau_status=PASS`, meaning the tail of the run stayed within the configured growth and slope limits.
+
 ## Ubuntu 22.04 verification
 
 ```bash

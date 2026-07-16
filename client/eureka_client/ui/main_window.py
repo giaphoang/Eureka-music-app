@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from PySide2.QtCore import QAbstractTableModel, QModelIndex, QThreadPool, Qt
+from PySide2.QtGui import QCloseEvent
 from PySide2.QtMultimedia import QMediaPlayer
 from PySide2.QtWidgets import (
     QAbstractItemView,
@@ -362,6 +363,10 @@ class MainWindow(QMainWindow):
         QMessageBox.information(self, "Download", f"Saved to {path}")
 
     def refresh_local(self) -> None:
+        removed = self.db.prune_missing_downloads()
+        if removed:
+            self.refresh_playlists()
+            self.statusBar().showMessage(f"Removed {removed} missing local file(s).", 8000)
         self.local_tracks = self.db.list_downloads()
         self.local_table.set_tracks(self.local_tracks)
 
@@ -410,7 +415,14 @@ class MainWindow(QMainWindow):
         name, ok = QInputDialog.getItem(self, "Add to playlist", "Playlist", names, 0, False)
         if ok:
             playlist = next(p for p in playlists if p["name"] == name)
-            self.db.add_to_playlist(playlist["id"], track["server_id"])
+            added = self.db.add_to_playlist(playlist["id"], track["server_id"])
+            if not added:
+                QMessageBox.information(
+                    self,
+                    "Playlist",
+                    "This song is already in the playlist.",
+                )
+                return
             self.refresh_playlists()
 
     def play_playlist(self) -> None:
@@ -493,3 +505,10 @@ class MainWindow(QMainWindow):
     def _show_error(self, message: str) -> None:
         short = message.strip().splitlines()[-1] if message else "Unknown error"
         QMessageBox.critical(self, "Eureka Music error", short)
+
+    def shutdown(self) -> None:
+        self.player.shutdown()
+
+    def closeEvent(self, event: QCloseEvent) -> None:
+        self.shutdown()
+        super().closeEvent(event)
