@@ -4,6 +4,7 @@ from fastapi import FastAPI
 
 from app.config import settings
 from app.database import Base, engine
+from app.routers.recommendations import router as recommendations_router
 from app.routers.tracks import router as tracks_router
 
 
@@ -16,6 +17,7 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(title="Eureka Music Server", version="0.1.0", lifespan=lifespan)
 app.include_router(tracks_router, prefix="/api/v1")
+app.include_router(recommendations_router, prefix="/api/v1")
 
 
 @app.get("/health")
