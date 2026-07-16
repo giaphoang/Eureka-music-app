@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
 import argparse
 import shutil
+import sys
 from pathlib import Path
 
 import pandas as pd
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from eureka_client.config import DOWNLOAD_DIR, ensure_dirs
 from eureka_client.db import ClientDB
