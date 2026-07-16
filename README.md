@@ -4,6 +4,7 @@ A runnable reference implementation for the Eureka Robotics music assignment:
 
 - FastAPI + PostgreSQL server in Docker Compose
 - PySide2 desktop client in a Python virtual environment
+- Spotify-inspired desktop client shell with sidebar navigation, top search, persistent player bar, and optional queue panel
 - Server catalog/search/download/upload
 - Local SQLite downloads and playlists
 - Play, pause/continue, stop, seek, next/previous, shuffle, loop-one, loop-all
@@ -58,6 +59,20 @@ Expected:
 ```
 
 API documentation: `http://localhost:8000/docs`
+
+## UI refactor evidence
+
+The desktop client now uses a Spotify-inspired PySide2 shell while preserving the existing server, SQLite, download, upload, playback, playlist, worker, and seed behavior.
+
+Refactor documentation:
+
+- `docs/ui-refactor/BASELINE.md`
+- `docs/ui-refactor/UI_DESIGN.md`
+- `docs/ui-refactor/COMPONENT_MAP.md`
+- `docs/ui-refactor/REGRESSION_REPORT.md`
+- `docs/ui-refactor/PERFORMANCE_COMPARISON.md`
+- `docs/ui-refactor/MANUAL_TEST_RESULTS.md`
+- `docs/ui-refactor/SCREENSHOTS.md`
 
 ## 3. Install FMA Small and seed data
 
