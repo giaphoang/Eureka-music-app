@@ -151,6 +151,7 @@ def main() -> int:
     stop_requested = False
     finished = False
     measurement_error: str | None = None
+    operation_error: str | None = None
 
     def elapsed_s() -> float:
         return time.monotonic() - started_at
@@ -177,24 +178,34 @@ def main() -> int:
         print(f"{sample.elapsed_s:8.1f}s rss={sample.rss_mb:8.1f}MB phase={phase}", flush=True)
 
     def run_operation() -> None:
-        nonlocal operation_index
+        nonlocal operation_index, operation_error
         if stop_requested or time.monotonic() >= deadline_s:
             finish()
             return
 
         phase = current_phase()
-        if phase == "refresh_local":
-            window.refresh_local()
-        elif phase == "refresh_playlists":
-            window.refresh_playlists()
-        elif phase == "search_catalog":
-            term = search_terms[operation_index % len(search_terms)]
-            window.search_input.setText(term)
-            window.search_catalog()
-        elif phase == "queue_load" and window.local_tracks:
-            index = operation_index % len(window.local_tracks)
-            window.player.set_queue(window.local_tracks, index)
-            QTimer.singleShot(250, window.player.stop)
+        try:
+            if phase == "refresh_local":
+                window.refresh_local()
+            elif phase == "refresh_playlists":
+                window.refresh_playlists()
+            elif phase == "search_catalog":
+                term = search_terms[operation_index % len(search_terms)]
+                if hasattr(window, "top_bar"):
+                    window.top_bar.search_input.setText(term)
+                    window.search_catalog(term)
+                else:
+                    window.search_input.setText(term)
+                    window.search_catalog()
+            elif phase == "queue_load" and window.local_tracks:
+                index = operation_index % len(window.local_tracks)
+                window.player.set_queue(window.local_tracks, index)
+                QTimer.singleShot(250, window.player.stop)
+        except Exception as exc:
+            operation_error = str(exc)
+            print(f"operation_error={operation_error}", flush=True)
+            finish()
+            return
 
         operation_index += 1
         QTimer.singleShot(int(args.operation_seconds * 1000), run_operation)
@@ -239,6 +250,8 @@ def main() -> int:
         print(f"tail_slope_mb_per_min={slope:.3f}", flush=True)
         if measurement_error:
             print(f"measurement_error={measurement_error}", flush=True)
+        if operation_error:
+            print(f"operation_error={operation_error}", flush=True)
         print(f"plateau_status={'PASS' if plateau_pass else 'PARTIAL_PASS_OR_FAIL'}", flush=True)
         if args.csv:
             print(f"csv={args.csv}", flush=True)

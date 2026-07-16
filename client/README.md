@@ -1,5 +1,16 @@
 # Desktop client
 
+The client uses a Spotify-inspired PySide2 desktop shell:
+
+- Left navigation sidebar
+- Persistent top search bar
+- Reusable central pages
+- Persistent bottom playback bar
+- Optional queue panel
+- Dark local theme and bundled SVG icons
+
+The UI refactor evidence is documented under `../docs/ui-refactor/`.
+
 ## Important for Apple Silicon Macs
 
 PySide2 5.15.2.1 on macOS supports Intel x86_64, not Apple Silicon arm64/aarch64. On an Apple Silicon Mac, Python normally runs as arm64, but the available PySide2 macOS wheel was compiled for x86_64. Because those architectures do not match, pip reports that no compatible version exists.
