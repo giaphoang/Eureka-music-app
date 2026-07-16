@@ -30,3 +30,9 @@ Remove `--limit 100` for all 8,000 tracks.
 curl 'http://localhost:8000/api/v1/tracks?limit=5'
 docker compose logs -f api
 ```
+
+Run server tests from the repository root:
+
+```bash
+docker compose run --rm api python -m pytest -q
+```

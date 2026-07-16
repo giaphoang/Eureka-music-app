@@ -10,7 +10,7 @@ server-logs:
 	docker compose logs -f api
 
 server-test:
-	docker compose run --rm api pytest -q
+	docker compose run --rm api python -m pytest -q
 
 client-install:
 	cd client && python -m pip install -r requirements.txt
