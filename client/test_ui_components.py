@@ -11,6 +11,7 @@ from eureka_client.ui.components.queue_panel import QueuePanel
 from eureka_client.ui.components.sidebar import Sidebar
 from eureka_client.ui.components.track_table import TrackTable
 from eureka_client.ui.pages.downloads_page import DownloadsPage
+from eureka_client.ui.pages.recommendation_page import RecommendationPage
 
 
 def app() -> QApplication:
@@ -28,10 +29,11 @@ def test_sidebar_navigation_and_playlist_signals() -> None:
     sidebar.set_playlists([{"id": 7, "name": "Road", "track_count": 3}])
 
     sidebar._buttons["downloads"].click()
+    sidebar._buttons["recommendations"].click()
     sidebar.playlist_list.setCurrentRow(0)
     sidebar.set_active_page("downloads")
 
-    assert pages == ["downloads"]
+    assert pages == ["downloads", "recommendations"]
     assert playlists == [7]
     assert sidebar._buttons["downloads"].isChecked() is True
     assert sidebar._buttons["browse"].isChecked() is False
@@ -108,3 +110,30 @@ def test_downloads_page_has_no_play_selected_button() -> None:
     assert "Play selected" not in button_texts
     assert "Add to playlist" in button_texts
     assert "Refresh" in button_texts
+
+
+def test_recommendation_page_emits_prompt_size_and_uses_table_model() -> None:
+    app()
+    page = RecommendationPage()
+    requests: list[tuple[str, int]] = []
+    page.generate_requested.connect(lambda prompt, size: requests.append((prompt, size)))
+    page.prompt_input.setPlainText("  dreamy   electronic focus  ")
+    page.size_input.setValue(5)
+
+    page.generate_button.click()
+    page.set_tracks(
+        [
+            {
+                "position": 1,
+                "title": "Song",
+                "artist": "Artist",
+                "album": None,
+                "genre": "Electronic",
+                "prompt_similarity": 0.91,
+            }
+        ]
+    )
+
+    assert requests == [("dreamy electronic focus", 5)]
+    assert page.model_data.rowCount() == 1
+    assert page.model_data.data(page.model_data.index(0, 5)) == "0.91"
