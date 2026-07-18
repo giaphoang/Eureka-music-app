@@ -130,9 +130,8 @@ class MainWindow(QMainWindow):
 
         self.playlist_page.create_requested.connect(self.create_playlist)
         self.playlist_page.play_requested.connect(self.play_playlist)
-        self.playlist_page.move_up_requested.connect(lambda: self.move_playlist_item(-1))
-        self.playlist_page.move_down_requested.connect(lambda: self.move_playlist_item(1))
         self.playlist_page.remove_requested.connect(self.remove_playlist_item)
+        self.playlist_page.table.track_clicked.connect(self.play_playlist_from_track)
         self.playlist_page.table.track_activated.connect(self.play_playlist_from_track)
 
         self.recommendation_page.generate_requested.connect(self.generate_recommendations)

@@ -11,6 +11,7 @@ from eureka_client.ui.components.queue_panel import QueuePanel
 from eureka_client.ui.components.sidebar import Sidebar
 from eureka_client.ui.components.track_table import TrackTable
 from eureka_client.ui.pages.downloads_page import DownloadsPage
+from eureka_client.ui.pages.playlist_page import PlaylistPage
 from eureka_client.ui.pages.recommendation_page import RecommendationPage
 
 
@@ -110,6 +111,24 @@ def test_downloads_page_has_no_play_selected_button() -> None:
     assert "Play selected" not in button_texts
     assert "Add to playlist" in button_texts
     assert "Refresh" in button_texts
+
+
+def test_playlist_page_hides_manual_move_buttons_and_emits_row_click() -> None:
+    app()
+    page = PlaylistPage()
+    track = {"server_id": 1, "title": "Song", "artist": "Artist"}
+    clicked: list[dict] = []
+    page.table.track_clicked.connect(clicked.append)
+    page.set_tracks({"id": 4, "name": "Mix"}, [track])
+
+    button_texts = [button.text() for button in page.findChildren(QPushButton)]
+    page.table._click_index(page.table.model_data.index(0, 0))
+
+    assert "Move up" not in button_texts
+    assert "Move down" not in button_texts
+    assert "Play playlist" in button_texts
+    assert "Remove" in button_texts
+    assert clicked == [track]
 
 
 def test_recommendation_page_emits_prompt_size_and_uses_table_model() -> None:

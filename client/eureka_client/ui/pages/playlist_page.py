@@ -10,8 +10,6 @@ from eureka_client.ui.components.track_table import TrackTable
 class PlaylistPage(QWidget):
     create_requested = Signal()
     play_requested = Signal()
-    move_up_requested = Signal()
-    move_down_requested = Signal()
     remove_requested = Signal()
 
     def __init__(self) -> None:
@@ -38,15 +36,9 @@ class PlaylistPage(QWidget):
         play = QPushButton("Play playlist")
         play.setProperty("role", "primary")
         play.clicked.connect(self.play_requested)
-        up = QPushButton("Move up")
-        up.clicked.connect(self.move_up_requested)
-        down = QPushButton("Move down")
-        down.clicked.connect(self.move_down_requested)
         remove = QPushButton("Remove")
         remove.clicked.connect(self.remove_requested)
         controls.addWidget(play)
-        controls.addWidget(up)
-        controls.addWidget(down)
         controls.addWidget(remove)
         controls.addStretch()
 
