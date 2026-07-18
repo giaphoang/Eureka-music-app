@@ -75,6 +75,215 @@
     border: 1px solid #2A2A2A;
 }
 
+#PlaylistHero {
+    background: qlineargradient(
+        x1: 0, y1: 0,
+        x2: 0, y2: 1,
+        stop: 0 #353535,
+        stop: 0.58 #202020,
+        stop: 1 #121212
+    );
+}
+
+#PlaylistCover {
+    background: #202020;
+    border: 1px solid #303030;
+    border-radius: 4px;
+}
+
+#PlaylistCover:hover {
+    border-color: #555555;
+}
+
+#PlaylistPlayButton {
+    background: #1ED760;
+    border: none;
+    border-radius: 28px;
+    min-width: 56px;
+    max-width: 56px;
+    min-height: 56px;
+    max-height: 56px;
+    padding: 0;
+}
+
+#PlaylistPlayButton:hover {
+    background: #24E36A;
+}
+
+#PlaylistPlayButton:disabled {
+    background: #303030;
+}
+
+QLabel[role="playlistKind"] {
+    color: #FFFFFF;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+#PlaylistTitle {
+    color: #FFFFFF;
+    font-size: 42px;
+    font-weight: 800;
+}
+
+QLabel[role="playlistMeta"] {
+    color: #D6D6D6;
+    font-size: 13px;
+}
+
+#PlaylistSearchSection {
+    background: #121212;
+}
+
+QLabel[role="playlistSearchTitle"] {
+    color: #FFFFFF;
+    font-size: 20px;
+    font-weight: 700;
+}
+
+#PlaylistSearchBox {
+    background: #242424;
+    border: 1px solid #303030;
+    border-radius: 8px;
+    min-height: 34px;
+    max-width: 420px;
+}
+
+#PlaylistLocalSearchInput {
+    background: transparent;
+    border: none;
+    color: #FFFFFF;
+    padding: 7px 2px;
+}
+
+#PlaylistLocalSearchInput:focus {
+    border: none;
+}
+
+#PlaylistClearSearchButton {
+    background: transparent;
+    border: none;
+    color: #B3B3B3;
+    min-width: 26px;
+    max-width: 26px;
+    min-height: 26px;
+    max-height: 26px;
+    padding: 0;
+    font-size: 16px;
+}
+
+#PlaylistClearSearchButton:hover {
+    color: #FFFFFF;
+    background: #303030;
+}
+
+#PlaylistSearchResults {
+    background: #121212;
+    color: #FFFFFF;
+    border: none;
+    max-height: 164px;
+}
+
+#PlaylistSearchResults QWidget {
+    background: #121212;
+}
+
+#PlaylistSearchResultRow {
+    background: #181818;
+    border: 1px solid #2A2A2A;
+    border-radius: 6px;
+}
+
+#PlaylistSearchResultRow:hover {
+    background: #202020;
+}
+
+#PlaylistSearchArtwork {
+    background: #303030;
+    border-radius: 4px;
+}
+
+QLabel[role="searchResultTitle"] {
+    color: #FFFFFF;
+    font-weight: 700;
+}
+
+QLabel[role="searchResultMeta"] {
+    color: #B3B3B3;
+    font-size: 12px;
+}
+
+#PlaylistSearchAddButton {
+    background: transparent;
+    color: #FFFFFF;
+    border: 1px solid #B3B3B3;
+    border-radius: 13px;
+    padding: 4px 14px;
+    min-height: 26px;
+}
+
+#PlaylistSearchAddButton:hover {
+    border-color: #FFFFFF;
+    background: #242424;
+}
+
+#PlaylistSearchAddButton[state="added"],
+#PlaylistSearchAddButton:disabled {
+    color: #1ED760;
+    border-color: #1ED760;
+    background: transparent;
+}
+
+#PlaylistContextMenu {
+    background: #181818;
+    color: #FFFFFF;
+    border: 1px solid #303030;
+    padding: 4px;
+}
+
+#PlaylistContextMenu::item {
+    background: transparent;
+    padding: 7px 28px 7px 10px;
+    border-radius: 4px;
+}
+
+#PlaylistContextMenu::item:selected {
+    background: #303030;
+}
+
+#DownloadsTrackMenu,
+#DownloadsPlaylistSubmenu {
+    background: #181818;
+    color: #FFFFFF;
+    border: 1px solid #303030;
+    padding: 4px;
+}
+
+#DownloadsTrackMenu::item,
+#DownloadsPlaylistSubmenu::item {
+    background: transparent;
+    padding: 7px 28px 7px 10px;
+    border-radius: 4px;
+}
+
+#DownloadsTrackMenu::item:selected,
+#DownloadsPlaylistSubmenu::item:selected {
+    background: #303030;
+}
+
+#DownloadsPlaylistSearchInput {
+    background: #242424;
+    color: #FFFFFF;
+    border: 1px solid #303030;
+    border-radius: 6px;
+    padding: 7px 9px;
+    min-width: 180px;
+}
+
+#PlaylistSearchEmpty {
+    min-height: 96px;
+}
+
 #TrackTable::item {
     padding: 6px;
 }
@@ -83,12 +292,85 @@
     background: #242424;
 }
 
+#TrackOverflowButton {
+    background: transparent;
+    color: #FFFFFF;
+    border: none;
+    border-radius: 14px;
+    min-width: 32px;
+    max-width: 32px;
+    min-height: 28px;
+    max-height: 28px;
+    padding: 0;
+    font-weight: 700;
+}
+
+#TrackOverflowButton:hover,
+#TrackOverflowButton:focus,
+#TrackOverflowButton[active="true"] {
+    background: #303030;
+    color: #FFFFFF;
+}
+
 #SidebarPlaylistList {
     background: #000000;
     color: #B3B3B3;
     border: none;
     selection-background-color: #242424;
     selection-color: #FFFFFF;
+}
+
+#SidebarPlaylistList::item {
+    min-height: 34px;
+}
+
+#SidebarPlaylistRow {
+    background: transparent;
+    border-radius: 5px;
+}
+
+#SidebarPlaylistRow:hover {
+    background: #242424;
+}
+
+#SidebarPlaylistTitle {
+    color: #B3B3B3;
+}
+
+#SidebarPlaylistOverflowButton {
+    background: transparent;
+    color: #FFFFFF;
+    border: none;
+    border-radius: 12px;
+    min-width: 28px;
+    max-width: 28px;
+    min-height: 24px;
+    max-height: 24px;
+    padding: 0;
+    font-weight: 700;
+}
+
+#SidebarPlaylistOverflowButton:hover,
+#SidebarPlaylistOverflowButton:focus,
+#SidebarPlaylistOverflowButton[active="true"] {
+    background: #303030;
+}
+
+#SidebarPlaylistMenu {
+    background: #181818;
+    color: #FFFFFF;
+    border: 1px solid #303030;
+    padding: 4px;
+}
+
+#SidebarPlaylistMenu::item {
+    background: transparent;
+    padding: 7px 28px 7px 10px;
+    border-radius: 4px;
+}
+
+#SidebarPlaylistMenu::item:selected {
+    background: #303030;
 }
 
 QHeaderView::section {
