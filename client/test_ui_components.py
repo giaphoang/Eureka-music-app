@@ -264,6 +264,34 @@ def test_browse_page_uses_hover_download_row_buttons() -> None:
     assert downloads == [track]
 
 
+def test_browse_page_exposes_previous_and_next_pagination_buttons() -> None:
+    app()
+    page = BrowsePage()
+    track = {"server_id": 1, "title": "Song", "artist": "Artist"}
+    previous_requests: list[bool] = []
+    next_requests: list[bool] = []
+    page.previous_page_requested.connect(lambda: previous_requests.append(True))
+    page.next_page_requested.connect(lambda: next_requests.append(True))
+
+    page.set_page([track], total=12, offset=0, limit=1)
+
+    assert page.previous_button.accessibleName() == "Previous browse page"
+    assert page.next_button.accessibleName() == "Next browse page"
+    assert page.previous_button.isEnabled() is False
+    assert page.next_button.isEnabled() is True
+
+    page.next_button.click()
+    assert next_requests == [True]
+
+    page.set_page([track], total=12, offset=11, limit=1)
+
+    assert page.previous_button.isEnabled() is True
+    assert page.next_button.isEnabled() is False
+
+    page.previous_button.click()
+    assert previous_requests == [True]
+
+
 def test_top_bar_hides_search_button_with_input_and_has_no_nav_chevrons() -> None:
     app()
     top_bar = TopBar()
