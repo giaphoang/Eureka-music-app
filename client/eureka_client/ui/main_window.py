@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import os
+import shutil
 from pathlib import Path
 
 from PySide2.QtCore import QThreadPool, Qt
-from PySide2.QtGui import QCloseEvent, QKeySequence
+from PySide2.QtGui import QCloseEvent, QKeySequence, QPixmap
+from PySide2.QtMultimedia import QMediaPlayer
 from PySide2.QtWidgets import (
     QFileDialog,
     QHBoxLayout,
@@ -17,6 +20,7 @@ from PySide2.QtWidgets import (
 )
 
 from eureka_client.api import MusicAPI
+from eureka_client.config import PLAYLIST_COVER_DIR
 from eureka_client.db import ClientDB
 from eureka_client.player import PlaybackController
 from eureka_client.ui.components import PlayerBar, QueuePanel, Sidebar, Toast, TopBar
@@ -55,6 +59,8 @@ class MainWindow(QMainWindow):
         self.current_queue: list[dict] = []
         self.current_page = "browse"
         self._catalog_request_id = 0
+        self._browse_search_text = ""
+        self._downloads_search_text = ""
 
         root = QWidget()
         root.setObjectName("AppRoot")
@@ -116,21 +122,24 @@ class MainWindow(QMainWindow):
     def _connect_signals(self) -> None:
         self.sidebar.page_requested.connect(self.show_page)
         self.sidebar.playlist_requested.connect(self.show_playlist)
+        self.sidebar.playlist_delete_requested.connect(self.delete_playlist)
 
-        self.top_bar.search_submitted.connect(self.search_catalog)
+        self.top_bar.search_submitted.connect(self.handle_top_search)
+        self.top_bar.search_input.textChanged.connect(self.handle_top_search_text_changed)
 
         self.browse_page.download_requested.connect(self.download_selected)
-        self.browse_page.previous_page_requested.connect(self.previous_catalog_page)
-        self.browse_page.next_page_requested.connect(self.next_catalog_page)
-
-        self.downloads_page.add_to_playlist_requested.connect(self.add_local_to_playlist)
+        self.browse_page.download_track_requested.connect(self.download_track)
+        self.downloads_page.add_track_to_playlist_requested.connect(self.add_download_to_playlist)
+        self.downloads_page.create_playlist_with_track_requested.connect(self.create_playlist_with_download)
         self.downloads_page.refresh_requested.connect(self.refresh_local)
         self.downloads_page.table.track_clicked.connect(self.play_track_from_downloads)
         self.downloads_page.table.track_activated.connect(self.play_track_from_downloads)
 
         self.playlist_page.create_requested.connect(self.create_playlist)
-        self.playlist_page.play_requested.connect(self.play_playlist)
-        self.playlist_page.remove_requested.connect(self.remove_playlist_item)
+        self.playlist_page.cover_requested.connect(self.choose_playlist_cover)
+        self.playlist_page.primary_play_requested.connect(self.playlist_primary_action)
+        self.playlist_page.add_search_result_requested.connect(self.add_search_result_to_playlist)
+        self.playlist_page.remove_track_requested.connect(self.remove_playlist_track)
         self.playlist_page.table.track_clicked.connect(self.play_playlist_from_track)
         self.playlist_page.table.track_activated.connect(self.play_playlist_from_track)
 
@@ -156,6 +165,7 @@ class MainWindow(QMainWindow):
         self.player.position_changed.connect(self.player_bar.set_position)
         self.player.duration_changed.connect(self.player_bar.set_duration)
         self.player.state_changed.connect(self.player_bar.set_state)
+        self.player.state_changed.connect(self._update_playlist_play_state)
         self.player.error.connect(self._show_error)
 
     def _install_shortcuts(self) -> None:
@@ -189,11 +199,20 @@ class MainWindow(QMainWindow):
     def show_page(self, page: str) -> None:
         if page not in self.pages:
             return
+        self.sidebar.close_playlist_menu()
+        self.playlist_page.close_track_menu()
+        self.downloads_page.close_track_menu()
         self.current_page = page
         self.stack.setCurrentWidget(self.pages[page])
         self.sidebar.set_active_page(page)
         self.top_bar.set_title(PAGE_TITLES[page])
-        self.top_bar.set_search_visible(page == "browse")
+        self.top_bar.set_search_visible(page in {"browse", "downloads"})
+        if page == "browse":
+            self.top_bar.set_search_placeholder("Search title, artist, or album")
+            self.top_bar.set_search_text(self._browse_search_text)
+        elif page == "downloads":
+            self.top_bar.set_search_placeholder("Search downloaded songs")
+            self.top_bar.set_search_text(self._downloads_search_text)
         if page == "downloads":
             self.refresh_local()
         elif page == "playlists":
@@ -207,9 +226,24 @@ class MainWindow(QMainWindow):
     def search_catalog(self, query: str | None = None) -> None:
         self.catalog_offset = 0
         if query is not None:
+            self._browse_search_text = query.strip()
             self.top_bar.search_input.setText(query)
         self.show_page("browse")
         self.refresh_catalog()
+
+    def handle_top_search(self, query: str) -> None:
+        if self.current_page == "browse":
+            self._browse_search_text = query.strip()
+            self.catalog_offset = 0
+            self.refresh_catalog()
+        elif self.current_page == "downloads":
+            self._downloads_search_text = query
+            self.downloads_page.set_search_query(query)
+
+    def handle_top_search_text_changed(self, query: str) -> None:
+        if self.current_page == "downloads":
+            self._downloads_search_text = query
+            self.downloads_page.set_search_query(query)
 
     def previous_catalog_page(self) -> None:
         self.catalog_offset = max(0, self.catalog_offset - self.catalog_limit)
@@ -263,6 +297,9 @@ class MainWindow(QMainWindow):
         if not track:
             self.toast.show_message("Select a track first.", "info")
             return
+        self.download_track(track)
+
+    def download_track(self, track: dict) -> None:
         self.toast.show_message(f"Downloading {track['title']}...", "info", 60_000)
         task = Task(self.api.download_track, track)
         task.signals.progress.connect(
@@ -372,6 +409,7 @@ class MainWindow(QMainWindow):
             self.toast.show_message(f"Removed {removed} missing local file(s).", "info")
         self.local_tracks = self.db.list_downloads()
         self.downloads_page.set_tracks(self.local_tracks)
+        self.playlist_page.set_downloaded_tracks(self.local_tracks)
 
     def play_track_from_downloads(self, track: dict) -> None:
         index = self.local_tracks.index(track)
@@ -381,9 +419,15 @@ class MainWindow(QMainWindow):
         selected = self.current_playlist_id
         self.playlists = self.db.list_playlists()
         self.sidebar.set_playlists(self.playlists)
+        self.downloads_page.set_playlists(self.playlists)
         self.sidebar.select_playlist(selected)
         if selected and any(playlist["id"] == selected for playlist in self.playlists):
             self.load_playlist_tracks_by_id(selected)
+        elif selected:
+            self.current_playlist_id = None
+            self.playlist_tracks = []
+            self.playlist_page.set_tracks(None, [])
+            self.sidebar.select_playlist(None)
         elif not self.playlists:
             self.current_playlist_id = None
             self.playlist_tracks = []
@@ -400,12 +444,88 @@ class MainWindow(QMainWindow):
                 self._show_error(str(exc))
             self.refresh_playlists()
 
+    def delete_playlist(self, playlist_id: int) -> None:
+        was_open = self.current_playlist_id == playlist_id
+        previous_playlist_id = self.current_playlist_id
+        previous_playlist_tracks = list(self.playlist_tracks)
+        previous_playlists = list(self.playlists)
+        self.playlists = [playlist for playlist in self.playlists if playlist["id"] != playlist_id]
+        self.sidebar.set_playlists(self.playlists)
+        if was_open:
+            self.current_playlist_id = None
+            self.playlist_tracks = []
+            self.playlist_page.set_tracks(None, [])
+        try:
+            self.db.delete_playlist(playlist_id)
+        except Exception as exc:
+            self.playlists = previous_playlists
+            self.current_playlist_id = previous_playlist_id
+            self.playlist_tracks = previous_playlist_tracks
+            self.sidebar.set_playlists(self.playlists)
+            if previous_playlist_id:
+                playlist = next((item for item in self.playlists if item["id"] == previous_playlist_id), None)
+                self.playlist_page.set_tracks(playlist, self.playlist_tracks)
+            self._show_error(str(exc))
+            return
+        if was_open:
+            self.show_page("playlists")
+        self.refresh_playlists()
+        self.toast.show_message("Deleted playlist.", "success")
+
     def load_playlist_tracks_by_id(self, playlist_id: int) -> None:
         self.current_playlist_id = playlist_id
         playlist = next((item for item in self.playlists if item["id"] == playlist_id), None)
         self.playlist_tracks = self.db.list_playlist_tracks(playlist_id)
         self.playlist_page.set_tracks(playlist, self.playlist_tracks)
         self.sidebar.select_playlist(playlist_id)
+
+    def choose_playlist_cover(self) -> None:
+        if self.current_playlist_id is None:
+            self.toast.show_message("Choose a playlist first.", "info")
+            return
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Choose playlist cover",
+            "",
+            "Images (*.png *.jpg *.jpeg *.webp)",
+        )
+        if not path:
+            return
+        source = Path(path)
+        if source.suffix.lower() not in {".png", ".jpg", ".jpeg", ".webp"}:
+            self.toast.show_message("Choose a PNG, JPG, JPEG, or WebP image.", "error")
+            return
+        if QPixmap(str(source)).isNull():
+            self.toast.show_message("Could not read that image.", "error")
+            return
+        try:
+            cover_path = self._store_playlist_cover(self.current_playlist_id, source)
+            self.db.set_playlist_cover(self.current_playlist_id, str(cover_path))
+        except Exception as exc:
+            self._show_error(str(exc))
+            return
+        playlist = next((item for item in self.playlists if item["id"] == self.current_playlist_id), None)
+        if playlist is not None:
+            playlist["cover_path"] = str(cover_path)
+        self.playlist_page.cover.set_cover_path(str(cover_path))
+        self.refresh_playlists()
+        self.toast.show_message("Updated playlist cover.", "success")
+
+    @staticmethod
+    def _store_playlist_cover(playlist_id: int, source: Path) -> Path:
+        PLAYLIST_COVER_DIR.mkdir(parents=True, exist_ok=True)
+        suffix = source.suffix.lower()
+        destination = PLAYLIST_COVER_DIR / f"playlist_{playlist_id}{suffix}"
+        temporary = PLAYLIST_COVER_DIR / f".playlist_{playlist_id}{suffix}.part"
+        with source.open("rb") as src, temporary.open("wb") as dst:
+            shutil.copyfileobj(src, dst, length=1024 * 1024)
+            dst.flush()
+            os.fsync(dst.fileno())
+        os.replace(temporary, destination)
+        for old_path in PLAYLIST_COVER_DIR.glob(f"playlist_{playlist_id}.*"):
+            if old_path != destination:
+                old_path.unlink(missing_ok=True)
+        return destination
 
     def add_local_to_playlist(self) -> None:
         track = self.downloads_page.selected_track()
@@ -428,11 +548,91 @@ class MainWindow(QMainWindow):
             self.current_playlist_id = playlist["id"]
             self.refresh_playlists()
 
+    def add_download_to_playlist(self, track: dict, playlist_id: int) -> None:
+        playlist = next((item for item in self.playlists if item["id"] == playlist_id), None)
+        if playlist is None:
+            self.toast.show_message("Playlist not found.", "error")
+            self.refresh_playlists()
+            return
+        try:
+            added = self.db.add_to_playlist(playlist_id, track["server_id"])
+        except Exception as exc:
+            self._show_error(str(exc))
+            return
+        if not added:
+            self.toast.show_message("This song is already in the playlist.", "info")
+            return
+        if self.current_playlist_id == playlist_id:
+            self.load_playlist_tracks_by_id(playlist_id)
+        self.refresh_playlists()
+        self.toast.show_message(f"Added to {playlist['name']}", "success")
+
+    def create_playlist_with_download(self, track: dict) -> None:
+        name, ok = QInputDialog.getText(self, "New playlist", "Playlist name")
+        if not ok or not name.strip():
+            return
+        try:
+            playlist_id = self.db.create_playlist(name)
+            self.db.add_to_playlist(playlist_id, track["server_id"])
+        except Exception as exc:
+            self._show_error(str(exc))
+            return
+        self.current_playlist_id = playlist_id
+        self.refresh_playlists()
+        self.toast.show_message(f"Created {name.strip()} and added song.", "success")
+
+    def add_search_result_to_playlist(self, track: dict) -> None:
+        if self.current_playlist_id is None:
+            self.toast.show_message("Choose a playlist first.", "info")
+            return
+        track_id = int(track["server_id"])
+        if any(int(item["server_id"]) == track_id for item in self.playlist_tracks):
+            self.playlist_page.set_search_result_added(track_id, True)
+            self.toast.show_message("This song is already in the playlist.", "info")
+            return
+
+        previous_tracks = list(self.playlist_tracks)
+        playlist = next((item for item in self.playlists if item["id"] == self.current_playlist_id), None)
+        if playlist is None:
+            playlist = {"id": self.current_playlist_id, "name": "playlist"}
+        playlist_name = playlist["name"] if playlist else "playlist"
+        self.playlist_tracks = [*self.playlist_tracks, track]
+        self.playlist_page.set_tracks(playlist, self.playlist_tracks)
+
+        try:
+            added = self.db.add_to_playlist(self.current_playlist_id, track_id)
+        except Exception as exc:
+            self.playlist_tracks = previous_tracks
+            self.playlist_page.set_tracks(playlist, self.playlist_tracks)
+            self.playlist_page.set_search_result_added(track_id, False)
+            self._show_error(str(exc))
+            return
+        if not added:
+            self.playlist_tracks = previous_tracks
+            self.playlist_page.set_tracks(playlist, self.playlist_tracks)
+            self.playlist_page.set_search_result_added(track_id, True)
+            self.toast.show_message("This song is already in the playlist.", "info")
+            self.refresh_playlists()
+            return
+
+        self.load_playlist_tracks_by_id(self.current_playlist_id)
+        self.refresh_playlists()
+        self.toast.show_message(f"Added to {playlist_name}", "success")
+
     def play_playlist(self) -> None:
         if self.playlist_tracks:
             self._set_playback_queue(self.playlist_tracks, 0)
         else:
             self.toast.show_message("Playlist is empty.", "info")
+
+    def playlist_primary_action(self) -> None:
+        if not self.playlist_tracks:
+            self.toast.show_message("Playlist is empty.", "info")
+            return
+        if self._current_queue_is_playlist() and self.player.index >= 0:
+            self.player.toggle()
+            return
+        self._set_playback_queue(self.playlist_tracks, 0)
 
     def play_playlist_from_track(self, track: dict) -> None:
         if track in self.playlist_tracks:
@@ -446,11 +646,31 @@ class MainWindow(QMainWindow):
 
     def remove_playlist_item(self) -> None:
         track = self.playlist_page.selected_track()
-        if track and self.current_playlist_id:
-            self.db.remove_from_playlist(self.current_playlist_id, track["server_id"])
-            self.load_playlist_tracks_by_id(self.current_playlist_id)
-            self.refresh_playlists()
-            self.toast.show_message("Removed from playlist.", "success")
+        if track:
+            self.remove_playlist_track(track)
+
+    def remove_playlist_track(self, track: dict) -> None:
+        if not self.current_playlist_id:
+            return
+        track_id = int(track["server_id"])
+        previous_tracks = list(self.playlist_tracks)
+        playlist = next((item for item in self.playlists if item["id"] == self.current_playlist_id), None)
+        if playlist is None:
+            playlist = {"id": self.current_playlist_id, "name": "playlist"}
+        self.playlist_tracks = [item for item in self.playlist_tracks if int(item["server_id"]) != track_id]
+        self.playlist_page.set_tracks(playlist, self.playlist_tracks)
+        self.playlist_page.set_search_result_added(track_id, False)
+        try:
+            self.db.remove_from_playlist(self.current_playlist_id, track_id)
+        except Exception as exc:
+            self.playlist_tracks = previous_tracks
+            self.playlist_page.set_tracks(playlist, self.playlist_tracks)
+            self.playlist_page.set_search_result_added(track_id, True)
+            self._show_error(str(exc))
+            return
+        self.refresh_playlists()
+        self.playlist_page.set_search_result_added(track_id, False)
+        self.toast.show_message("Removed from playlist.", "success")
 
     def choose_upload(self) -> None:
         path, _ = QFileDialog.getOpenFileName(
@@ -487,6 +707,7 @@ class MainWindow(QMainWindow):
         self.current_queue = list(tracks)
         self.queue_panel.set_queue(self.current_queue, index)
         self.player.set_queue(self.current_queue, index)
+        self._update_playlist_play_state(int(self.player.player.state()))
 
     def play_queue_row(self, row: int) -> None:
         if 0 <= row < len(self.current_queue):
@@ -509,6 +730,21 @@ class MainWindow(QMainWindow):
 
     def _change_loop(self, mode: str) -> None:
         self.player.loop_mode = mode
+
+    def _current_queue_is_playlist(self) -> bool:
+        if len(self.current_queue) != len(self.playlist_tracks):
+            return False
+        for current, playlist in zip(self.current_queue, self.playlist_tracks):
+            if (
+                current.get("server_id") != playlist.get("server_id")
+                or current.get("local_path") != playlist.get("local_path")
+            ):
+                return False
+        return bool(self.playlist_tracks)
+
+    def _update_playlist_play_state(self, state: int) -> None:
+        playing = state == QMediaPlayer.PlayingState and self._current_queue_is_playlist()
+        self.playlist_page.set_playing(playing)
 
     def _show_error(self, message: str) -> None:
         self.toast.show_message(self._short_error(message), "error", 8000)
