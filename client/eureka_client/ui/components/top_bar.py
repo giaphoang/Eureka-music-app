@@ -46,9 +46,8 @@ class TopBar(QWidget):
         search_button.setToolTip("Search")
         search_button.setAccessibleName("Search")
         search_button.clicked.connect(self._submit_search)
+        self.search_button = search_button
 
-        layout.addWidget(self.back_button)
-        layout.addWidget(self.forward_button)
         layout.addWidget(self.title)
         layout.addStretch()
         layout.addWidget(self.search_input, 0)
@@ -59,6 +58,15 @@ class TopBar(QWidget):
 
     def set_search_visible(self, visible: bool) -> None:
         self.search_input.setVisible(visible)
+        self.search_button.setVisible(visible)
+
+    def set_search_placeholder(self, placeholder: str) -> None:
+        self.search_input.setPlaceholderText(placeholder)
+
+    def set_search_text(self, text: str) -> None:
+        self.search_input.blockSignals(True)
+        self.search_input.setText(text)
+        self.search_input.blockSignals(False)
 
     def search_text(self) -> str:
         return self.search_input.text().strip()
