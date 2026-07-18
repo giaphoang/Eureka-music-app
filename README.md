@@ -63,6 +63,25 @@ Expected:
 
 API documentation: `http://localhost:8000/docs`
 
+Export the same OpenAPI contract to a reviewable JSON file:
+
+```bash
+make api-docs
+```
+
+Team development checks:
+
+```bash
+python -m pip install -r requirements-dev.txt
+make lint
+make type-check
+make test
+```
+
+`make lint` runs Ruff against `client/` and `server/`. `make type-check` runs
+mypy in gradual mode using the root `pyproject.toml`. `make test` runs the
+client tests locally and the server tests through Docker Compose.
+
 Recommendations are optional. Model caches, generated embeddings, and FAISS
 artifacts are kept outside Git. The default recommendation backend uses the
 larger music-specialized LAION CLAP checkpoint for better playlist quality. The

@@ -1,4 +1,9 @@
-.PHONY: server-up server-down server-logs server-test client-install client-run
+PYTHON ?= python
+
+.PHONY: \
+	server-up server-down server-logs server-test \
+	client-install client-run client-test \
+	dev-install lint type-check test quality api-docs
 
 server-up:
 	docker compose up --build -d
@@ -17,3 +22,22 @@ client-install:
 
 client-run:
 	cd client && python -m eureka_client.app
+
+client-test:
+	cd client && $(PYTHON) -m pytest -q
+
+dev-install:
+	$(PYTHON) -m pip install -r requirements-dev.txt
+
+lint:
+	$(PYTHON) -m ruff check client server
+
+type-check:
+	$(PYTHON) -m mypy
+
+test: client-test server-test
+
+quality: lint type-check test
+
+api-docs:
+	cd server && $(PYTHON) -m scripts.export_openapi --output openapi.json
