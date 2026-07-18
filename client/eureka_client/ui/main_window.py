@@ -20,7 +20,7 @@ from eureka_client.api import MusicAPI
 from eureka_client.db import ClientDB
 from eureka_client.player import PlaybackController
 from eureka_client.ui.components import PlayerBar, QueuePanel, Sidebar, Toast, TopBar
-from eureka_client.ui.pages import BrowsePage, DownloadsPage, PlaylistPage, UploadPage
+from eureka_client.ui.pages import BrowsePage, DownloadsPage, PlaylistPage, RecommendationPage, UploadPage
 from eureka_client.workers.task import Task
 
 
@@ -28,6 +28,7 @@ PAGE_TITLES = {
     "browse": "Browse",
     "downloads": "Downloads",
     "playlists": "Playlists",
+    "recommendations": "AI Playlist",
     "upload": "Upload",
 }
 
@@ -49,6 +50,7 @@ class MainWindow(QMainWindow):
         self.local_tracks: list[dict] = []
         self.playlists: list[dict] = []
         self.playlist_tracks: list[dict] = []
+        self.recommended_tracks: list[dict] = []
         self.current_playlist_id: int | None = None
         self.current_queue: list[dict] = []
         self.current_page = "browse"
@@ -72,11 +74,13 @@ class MainWindow(QMainWindow):
         self.browse_page = BrowsePage()
         self.downloads_page = DownloadsPage()
         self.playlist_page = PlaylistPage()
+        self.recommendation_page = RecommendationPage()
         self.upload_page = UploadPage()
         self.pages = {
             "browse": self.browse_page,
             "downloads": self.downloads_page,
             "playlists": self.playlist_page,
+            "recommendations": self.recommendation_page,
             "upload": self.upload_page,
         }
         for page in self.pages.values():
@@ -130,6 +134,11 @@ class MainWindow(QMainWindow):
         self.playlist_page.move_down_requested.connect(lambda: self.move_playlist_item(1))
         self.playlist_page.remove_requested.connect(self.remove_playlist_item)
         self.playlist_page.table.track_activated.connect(self.play_playlist_from_track)
+
+        self.recommendation_page.generate_requested.connect(self.generate_recommendations)
+        self.recommendation_page.download_all_requested.connect(self.download_recommendations)
+        self.recommendation_page.save_playlist_requested.connect(self.save_recommendation_playlist)
+        self.recommendation_page.play_downloaded_requested.connect(self.play_recommendation_downloads)
 
         self.upload_page.browse_requested.connect(self.choose_upload)
         self.upload_page.upload_requested.connect(self.upload_selected)
@@ -263,6 +272,94 @@ class MainWindow(QMainWindow):
         task.signals.result.connect(lambda path: self._download_complete(track, path))
         task.signals.finished.connect(lambda: None)
         self.run_task(task)
+
+    def generate_recommendations(self, prompt: str, size: int) -> None:
+        if len(prompt) < 3:
+            self.toast.show_message("Enter a longer prompt.", "info")
+            return
+        self.recommendation_page.set_generating(True)
+        task = Task(self.api.generate_playlist, prompt, size)
+        task.signals.result.connect(self._recommendations_loaded)
+        task.signals.error.connect(self._recommendations_failed)
+        task.signals.finished.connect(lambda: self.recommendation_page.set_generating(False))
+        self.run_task(task, show_errors=False)
+
+    def _recommendations_failed(self, message: str) -> None:
+        short = self._short_error(message)
+        self.recommendation_page.set_error(short)
+        self.toast.show_message(short, "error")
+
+    def _recommendations_loaded(self, payload: dict) -> None:
+        self.recommended_tracks = payload.get("tracks", [])[:10]
+        self.recommendation_page.set_tracks(self.recommended_tracks)
+        self.toast.show_message("Generated playlist.", "success")
+
+    def download_recommendations(self) -> None:
+        if not self.recommended_tracks:
+            self.toast.show_message("Generate a playlist first.", "info")
+            return
+        downloaded = self.db.downloads_by_server_ids([int(track["id"]) for track in self.recommended_tracks])
+        pending = [track for track in self.recommended_tracks if int(track["id"]) not in downloaded]
+        if not pending:
+            self.toast.show_message("Recommended tracks are already downloaded.", "info")
+            return
+        self.toast.show_message(f"Downloading {len(pending)} recommended track(s)...", "info", 60_000)
+        task = Task(self._download_many, pending)
+        task.signals.result.connect(self._recommendation_downloads_complete)
+        self.run_task(task)
+
+    def _download_many(self, tracks: list[dict]) -> list[tuple[dict, Path]]:
+        completed: list[tuple[dict, Path]] = []
+        for track in tracks:
+            completed.append((track, self.api.download_track(track)))
+        return completed
+
+    def _recommendation_downloads_complete(self, completed: list[tuple[dict, Path]]) -> None:
+        for track, path in completed:
+            self.db.upsert_download(track, str(path))
+        self.refresh_local()
+        self.toast.show_message(f"Downloaded {len(completed)} recommended track(s).", "success")
+
+    def save_recommendation_playlist(self) -> None:
+        if not self.recommended_tracks:
+            self.toast.show_message("Generate a playlist first.", "info")
+            return
+        track_ids = [int(track["id"]) for track in self.recommended_tracks]
+        downloaded = self.db.downloads_by_server_ids(track_ids)
+        available_ids = [track_id for track_id in track_ids if track_id in downloaded]
+        if not available_ids:
+            self.toast.show_message("Download at least one generated track before saving.", "info")
+            return
+        name, ok = QInputDialog.getText(self, "Save generated playlist", "Playlist name")
+        if not ok or not name.strip():
+            return
+        try:
+            playlist_id = self.db.create_playlist_with_tracks(name, available_ids)
+        except Exception as exc:
+            self._show_error(str(exc))
+            return
+        self.current_playlist_id = playlist_id
+        self.refresh_playlists()
+        skipped = len(track_ids) - len(available_ids)
+        if skipped:
+            self.toast.show_message(f"Saved playlist with {len(available_ids)} downloaded track(s); skipped {skipped}.", "info")
+        else:
+            self.toast.show_message("Saved generated playlist.", "success")
+
+    def play_recommendation_downloads(self) -> None:
+        if not self.recommended_tracks:
+            self.toast.show_message("Generate a playlist first.", "info")
+            return
+        track_ids = [int(track["id"]) for track in self.recommended_tracks]
+        downloaded = self.db.downloads_by_server_ids(track_ids)
+        queue = [downloaded[track_id] for track_id in track_ids if track_id in downloaded]
+        if not queue:
+            self.toast.show_message("Download generated tracks before playing.", "info")
+            return
+        self._set_playback_queue(queue, 0)
+        skipped = len(track_ids) - len(queue)
+        if skipped:
+            self.toast.show_message(f"Playing downloaded generated tracks; skipped {skipped}.", "info")
 
     def _download_complete(self, track: dict, path: Path) -> None:
         self.db.upsert_download(track, str(path))

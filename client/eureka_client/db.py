@@ -154,6 +154,31 @@ class ClientDB:
             )
             return cursor.rowcount > 0
 
+    def downloads_by_server_ids(self, server_ids: list[int]) -> dict[int, dict]:
+        if not server_ids:
+            return {}
+        placeholders = ",".join("?" for _ in server_ids)
+        with self.connect() as conn:
+            rows = conn.execute(
+                f"SELECT * FROM downloaded_tracks WHERE server_id IN ({placeholders})",
+                [int(server_id) for server_id in server_ids],
+            ).fetchall()
+        return {int(row["server_id"]): dict(row) for row in rows}
+
+    def create_playlist_with_tracks(self, name: str, track_ids: list[int]) -> int:
+        with self.connect() as conn:
+            cursor = conn.execute("INSERT INTO playlists(name) VALUES (?)", (name.strip(),))
+            playlist_id = int(cursor.lastrowid)
+            conn.executemany(
+                "INSERT OR IGNORE INTO playlist_items(playlist_id, track_id, position) VALUES (?, ?, ?)",
+                [
+                    (playlist_id, int(track_id), position)
+                    for position, track_id in enumerate(dict.fromkeys(track_ids))
+                ],
+            )
+            self._normalize_positions(conn, playlist_id)
+            return playlist_id
+
     def list_playlist_tracks(self, playlist_id: int) -> list[dict]:
         with self.connect() as conn:
             rows = conn.execute(
