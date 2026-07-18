@@ -77,9 +77,6 @@ class RecommendationPage(QWidget):
         layout.setContentsMargins(18, 12, 18, 18)
         layout.setSpacing(10)
 
-        title = QLabel("AI Playlist")
-        title.setProperty("role", "pageTitle")
-
         prompt_row = QHBoxLayout()
         self.prompt_input = QPlainTextEdit()
         self.prompt_input.setPlaceholderText("Dreamy electronic music for late-night coding")
@@ -131,7 +128,6 @@ class RecommendationPage(QWidget):
         actions.addWidget(self.play_button)
         actions.addStretch()
 
-        layout.addWidget(title)
         layout.addLayout(prompt_row)
         layout.addWidget(self.status)
         layout.addWidget(self.loading)
