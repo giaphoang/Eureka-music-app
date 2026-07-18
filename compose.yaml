@@ -16,13 +16,32 @@ services:
   api:
     build:
       context: ./server
+      args:
+        INSTALL_RECOMMENDATION_DEPS: ${INSTALL_RECOMMENDATION_DEPS:-false}
+        INSTALL_LAION_CLAP_DEPS: ${INSTALL_LAION_CLAP_DEPS:-false}
     environment:
       DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://eureka:eureka@db:5432/eureka_music}
       AUDIO_ROOT: ${AUDIO_ROOT:-/data/audio}
+      CUDA_VISIBLE_DEVICES: ""
+      OMP_NUM_THREADS: ${OMP_NUM_THREADS:-4}
+      MKL_NUM_THREADS: ${MKL_NUM_THREADS:-4}
+      EUREKA_RECOMMENDATION_ENABLED: ${EUREKA_RECOMMENDATION_ENABLED:-false}
+      EUREKA_RECOMMENDATION_DIR: ${EUREKA_RECOMMENDATION_DIR:-/app/data/recommendation}
+      EUREKA_CLAP_BACKEND: ${EUREKA_CLAP_BACKEND:-laion}
+      EUREKA_HF_CLAP_MODEL_ID: ${EUREKA_HF_CLAP_MODEL_ID:-laion/clap-htsat-unfused}
+      EUREKA_HF_CLAP_CACHE_DIR: ${EUREKA_HF_CLAP_CACHE_DIR:-/hf-cache}
+      EUREKA_CLAP_CHECKPOINT: ${EUREKA_CLAP_CHECKPOINT:-/models/music_audioset_epoch_15_esc_90.14.pt}
+      EUREKA_CLAP_AUDIO_MODEL: ${EUREKA_CLAP_AUDIO_MODEL:-HTSAT-base}
+      EUREKA_CLAP_THREADS: ${EUREKA_CLAP_THREADS:-4}
+      EUREKA_RECOMMENDATION_CANDIDATES: ${EUREKA_RECOMMENDATION_CANDIDATES:-50}
+      EUREKA_MMR_LAMBDA: ${EUREKA_MMR_LAMBDA:-0.75}
     ports:
       - "${API_PORT:-8000}:8000"
     volumes:
       - audio-data:/data/audio
+      - recommendation-data:/app/data/recommendation
+      - hf-model-cache:/hf-cache
+      - ./models:/models:ro
     depends_on:
       db:
         condition: service_healthy
@@ -31,3 +50,5 @@ services:
 volumes:
   postgres-data:
   audio-data:
+  recommendation-data:
+  hf-model-cache:

@@ -10,3 +10,6 @@
 - Dataset ingestion from FMA multi-level CSV metadata.
 - Model/view UI design suitable for thousands of tracks.
 - Design documentation with context, container, ERD, sequence, and flow diagrams.
+- CPU-only CLAP retrieval integration with Hugging Face and optional LAION
+  backends, lazy model loading, FAISS artifacts, MMR diversity reranking, and
+  non-blocking PySide2 request handling.

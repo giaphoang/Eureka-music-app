@@ -45,6 +45,7 @@ flowchart TB
     Pool --> Files
     API --> PG
     API --> Media
+    API --> Rec[(Recommendation Artifacts)]
 ```
 
 ## Server ERD
@@ -153,6 +154,137 @@ flowchart LR
 Pages and components own presentation only. They emit Qt signals for user intent and do not perform direct HTTP or SQLite business logic.
 
 Large music collections continue to use `QTableView` with `QAbstractTableModel`. The refactor does not create one widget per track and does not load remote artwork at startup.
+
+## Prompt playlist recommendations
+
+Recommendations are an optional server-side feature. The client sends only a prompt
+and requested size. CLAP, FAISS, librosa, and PyTorch are never imported by the
+client and are loaded lazily by the server only when recommendation artifacts are
+configured. The default backend is the larger LAION music-specialized CLAP
+checkpoint on CPU. The Hugging Face `laion/clap-htsat-unfused` backend remains an
+optional lightweight fallback.
+
+The recommendation boundary keeps PostgreSQL authoritative. Artifact metadata stores
+FMA catalog keys such as `123`, resolved at request time as `Track.source_id =
+"fma:123"`. The API returns current server track IDs, not artifact row numbers or
+filesystem paths.
+
+```mermaid
+flowchart LR
+    Prompt[User Prompt] --> Worker[Qt Worker]
+    Worker --> API[POST /api/v1/recommendations/playlists]
+    API --> CLAP[CPU CLAP Text Embedding]
+    CLAP --> FAISS[IndexFlatIP Exact Search]
+    FAISS --> MMR[MMR Diversity]
+    MMR --> Smooth[Smooth Transition Ordering]
+    Smooth --> DB[(PostgreSQL Hydration)]
+    DB --> Worker
+    Worker --> UI[Recommendation Page]
+    UI --> Existing[Existing download, playlist, player flows]
+```
+
+Offline artifact build:
+
+```mermaid
+flowchart TB
+    FMA[FMA Small + tracks.csv] --> Parser[FMA Loader]
+    Parser --> Audio[CPU CLAP Audio Embeddings]
+    Parser --> Features[RMS Energy + Tempo]
+    Audio --> Embeddings[embeddings.npy]
+    Features --> Metadata[metadata.jsonl]
+    Embeddings --> Index[songs.faiss IndexFlatIP]
+    Metadata --> Manifest[manifest.json]
+    Index --> Validate[Validate release]
+    Manifest --> Validate
+    Validate --> Publish[Atomic CURRENT update]
+```
+
+Runtime request:
+
+```mermaid
+sequenceDiagram
+    participant UI as PySide2 UI
+    participant W as QThreadPool Task
+    participant API as FastAPI
+    participant CLAP as Lazy CPU CLAP
+    participant IDX as Artifacts + FAISS
+    participant DB as PostgreSQL
+    UI->>W: prompt, size
+    W->>API: POST recommendations/playlists
+    API->>CLAP: embed_text(prompt)
+    API->>IDX: top K exact cosine search
+    API->>IDX: MMR + transition order
+    API->>DB: WHERE source_id IN (...)
+    DB-->>API: current Track rows
+    API-->>W: ordered server track IDs
+    W-->>UI: render <= 10 rows
+```
+
+Complexity symbols:
+
+- `N`: indexed songs, about 8,000 for FMA Small.
+- `D`: CLAP embedding dimension.
+- `K`: retrieved candidates, default 50.
+- `M`: final playlist size, 5-10.
+
+Exact retrieval is approximately `O(ND)` per prompt. MMR is approximately
+`O(K * M * D)` in the straightforward implementation. Greedy transition ordering is
+approximately `O(M^2 * D)`. Embedding storage is `O(ND)`. At this scale an
+approximate index is unnecessary unless measured evidence shows exact search is too
+slow.
+
+MMR uses:
+
+```text
+MMR(i) = lambda_mmr * relevance(i)
+         - (1 - lambda_mmr) * max_similarity(i, already_selected)
+```
+
+Transition ordering uses:
+
+```text
+C(a, b) = 0.6 * (1 - cosine(audio_a, audio_b))
+        + 0.2 * abs(norm_energy_a - norm_energy_b)
+        + 0.2 * abs(norm_tempo_a - norm_tempo_b)
+```
+
+Energy and tempo are robust-scaled to `[0, 1]` with neutral imputation for missing
+or invalid values. CLAP model loading is process-local, CPU-only, guarded by a
+lock, and cached lazily. The artifact manifest records the CLAP backend and model
+identifier, and runtime rejects requests when the configured model does not match
+the index model because audio and text embeddings must share the same space.
+Prompt results use a small bounded LRU cache. Future personalization from user
+behavior is intentionally out of scope.
+
+The recommended evaluator setup uses:
+
+```text
+Backend: laion
+Model: HTSAT-base + music_audioset_epoch_15_esc_90.14.pt
+Device: CPU
+Audio embedding: offline index command
+Text embedding: runtime request
+```
+
+This is the heavier infrastructure path: the local checkpoint is about 2.35 GB,
+the Docker image needs the optional `laion-clap` stack, and Docker memory must be
+large enough to load the model. The benefit is quality: this checkpoint is
+music-specialized and gives better prompt relevance for the AI Playlist workflow
+than the smaller general-audio Hugging Face model.
+
+The optional Hugging Face setup uses `laion/clap-htsat-unfused`. Its repository is
+roughly 618 MB and setup is simpler, but it is a general audio CLAP model; music
+recommendation quality for abstract prompts may be weaker. Both backends remain
+CPU-only, lazy-loaded server-side, and require rebuilding the FAISS index when
+switching models.
+
+Benchmark prompts should include:
+
+- Dreamy electronic music for coding
+- Energetic rock for working out
+- Calm instrumental music for reading
+- Dark experimental music
+- Upbeat hip-hop
 
 ## API choice
 
