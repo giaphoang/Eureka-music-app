@@ -10,6 +10,9 @@ A runnable reference implementation for the Eureka Robotics music assignment:
 - Play, pause/continue, stop, seek, next/previous, shuffle, loop-one, loop-all
 - FMA Small seed scripts for both server and client
 - Background workers so HTTP and disk I/O do not block the UI thread
+- Optional CPU-only CLAP prompt-to-playlist retrieval on the server with the
+  music-specialized LAION CLAP checkpoint by default, exact FAISS search, MMR
+  diversity, and smooth transition ordering
 
 ## 1. Mac architecture decision
 
@@ -59,6 +62,15 @@ Expected:
 ```
 
 API documentation: `http://localhost:8000/docs`
+
+Recommendations are optional. Model caches, generated embeddings, and FAISS
+artifacts are kept outside Git. The default recommendation backend uses the
+larger music-specialized LAION CLAP checkpoint for better playlist quality. The
+smaller Hugging Face `laion/clap-htsat-unfused` backend remains available as a
+lighter infrastructure option with weaker music-specific prompt quality. Exact
+retrieval is appropriate here because FMA Small is about 8,000 tracks: scanning
+`N` normalized vectors is simple and small enough to avoid approximate-index
+complexity.
 
 ## UI refactor evidence
 

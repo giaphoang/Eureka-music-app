@@ -45,6 +45,22 @@ class FakeUploadClient:
         return self.response
 
 
+class FakeRecommendationClient:
+    def __init__(self, response) -> None:
+        self.response = response
+        self.requests: list[tuple[str, dict]] = []
+
+    def __enter__(self) -> "FakeRecommendationClient":
+        return self
+
+    def __exit__(self, *_: object) -> None:
+        return None
+
+    def post(self, url: str, **kwargs: object):
+        self.requests.append((url, kwargs))
+        return self.response
+
+
 def test_download_track_writes_file_and_progress(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setattr(api_module, "DOWNLOAD_DIR", tmp_path)
     monkeypatch.setattr(
@@ -124,6 +140,54 @@ def test_duplicate_upload_raises_user_visible_message(tmp_path: Path, monkeypatc
             audio,
             {"title": "Song", "artist": "Artist"},
         )
+
+
+def test_generate_playlist_posts_prompt_and_size_only(monkeypatch) -> None:
+    response = api_module.httpx.Response(
+        200,
+        json={
+            "prompt": "focus",
+            "strategy": "fake",
+            "tracks": [
+                {
+                    "position": 1,
+                    "track_id": 42,
+                    "title": "Song",
+                    "artist": "Artist",
+                    "album": None,
+                    "genre": "Electronic",
+                    "download_url": "/api/v1/tracks/42/download",
+                    "original_name": "song.mp3",
+                    "duration_ms": 30_000,
+                    "prompt_similarity": 0.9,
+                    "mmr_score": 0.8,
+                    "transition_cost_from_previous": None,
+                }
+            ],
+        },
+        request=api_module.httpx.Request("POST", "http://server/api/v1/recommendations/playlists"),
+    )
+    fake = FakeRecommendationClient(response)
+    monkeypatch.setattr(api_module.httpx, "Client", lambda *_, **__: fake)
+
+    payload = MusicAPI("http://server").generate_playlist("focus", 5)
+
+    assert fake.requests == [
+        ("/api/v1/recommendations/playlists", {"json": {"prompt": "focus", "size": 5}})
+    ]
+    assert payload["tracks"][0]["id"] == 42
+
+
+def test_generate_playlist_raises_user_visible_api_errors(monkeypatch) -> None:
+    response = api_module.httpx.Response(
+        503,
+        json={"detail": "Recommendation artifacts are not published."},
+        request=api_module.httpx.Request("POST", "http://server/api/v1/recommendations/playlists"),
+    )
+    monkeypatch.setattr(api_module.httpx, "Client", lambda *_, **__: FakeRecommendationClient(response))
+
+    with pytest.raises(UserVisibleAPIError, match="Recommendation artifacts are not published"):
+        MusicAPI("http://server").generate_playlist("focus", 5)
 
 
 def test_task_emits_user_visible_api_errors_without_traceback() -> None:

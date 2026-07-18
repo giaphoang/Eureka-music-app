@@ -28,6 +28,7 @@ class Sidebar(QWidget):
         self._add_nav(layout, "browse", "Browse", "home")
         self._add_nav(layout, "downloads", "Downloads", "download")
         self._add_nav(layout, "playlists", "Playlists", "list-music")
+        self._add_nav(layout, "recommendations", "AI Playlist", "list")
         self._add_nav(layout, "upload", "Upload", "upload")
 
         label = QLabel("Playlists")

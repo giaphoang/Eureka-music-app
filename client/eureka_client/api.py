@@ -41,6 +41,18 @@ class MusicAPI:
             response.raise_for_status()
             return response.json()
 
+    def generate_playlist(self, prompt: str, size: int) -> dict:
+        with httpx.Client(base_url=self.base_url, timeout=httpx.Timeout(180.0, connect=5.0)) as client:
+            response = client.post(
+                "/api/v1/recommendations/playlists",
+                json={"prompt": prompt, "size": size},
+            )
+            raise_for_api_status(response)
+            payload = response.json()
+        for track in payload.get("tracks", []):
+            track["id"] = track["track_id"]
+        return payload
+
     def download_track(
         self,
         track: dict,

@@ -62,6 +62,18 @@ python scripts/seed_fma.py "$HOME/data/fma" --limit 100
 
 Remove `--limit 100` to seed all 8,000 tracks.
 
+## Generated playlists
+
+Open `AI Playlist` from the sidebar, enter a prompt, choose 5-10 songs, and click
+`Generate`. The request runs in the existing `QThreadPool` worker path, so the Qt
+main thread does not perform HTTP or JSON parsing.
+
+Returned rows are server catalog tracks. `Download all` uses the existing download
+method, `Save playlist` stores downloaded generated tracks in the current SQLite
+playlist schema, and `Play downloaded` hands local files to the existing player
+queue. If the server or recommendation artifacts are unavailable, the page shows a
+recoverable error and local playback is unaffected.
+
 ## Memory plateau validation
 
 The long memory test repeats local refreshes, playlist refreshes, catalog searches, and muted playback queue loads while sampling RSS with `ps`.
