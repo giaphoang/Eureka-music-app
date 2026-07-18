@@ -10,4 +10,12 @@ server_data/
 client_data/
 *.sqlite3
 *.part
-
+models/
+recommendation-data/
+**/recommendation/releases/
+**/recommendation/CURRENT
+*.pt
+*.pth
+*.npy
+*.faiss
+failed_tracks.jsonl
