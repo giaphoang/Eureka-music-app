@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS downloaded_tracks (
 CREATE TABLE IF NOT EXISTS playlists (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL UNIQUE,
+    cover_path TEXT,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 CREATE TABLE IF NOT EXISTS playlist_items (
@@ -41,8 +42,11 @@ CREATE TABLE IF NOT EXISTS app_state (
 
 class ClientDB:
     def __init__(self, path: Path = DB_PATH) -> None:
-        ensure_dirs()
         self.path = path
+        if self.path == DB_PATH:
+            ensure_dirs()
+        else:
+            self.path.parent.mkdir(parents=True, exist_ok=True)
         self.initialize()
 
     @contextmanager
@@ -64,6 +68,9 @@ class ClientDB:
     def initialize(self) -> None:
         with self.connect() as conn:
             conn.executescript(SCHEMA)
+            columns = {row["name"] for row in conn.execute("PRAGMA table_info(playlists)").fetchall()}
+            if "cover_path" not in columns:
+                conn.execute("ALTER TABLE playlists ADD COLUMN cover_path TEXT")
 
     def upsert_download(self, track: dict, local_path: str) -> None:
         with self.connect() as conn:
@@ -133,7 +140,7 @@ class ClientDB:
         with self.connect() as conn:
             rows = conn.execute(
                 """
-                SELECT p.id, p.name, COUNT(pi.id) AS track_count
+                SELECT p.id, p.name, p.cover_path, COUNT(pi.id) AS track_count
                 FROM playlists p
                 LEFT JOIN playlist_items pi ON pi.playlist_id = p.id
                 GROUP BY p.id
@@ -141,6 +148,17 @@ class ClientDB:
                 """
             ).fetchall()
         return [dict(row) for row in rows]
+
+    def set_playlist_cover(self, playlist_id: int, cover_path: str) -> None:
+        with self.connect() as conn:
+            conn.execute(
+                "UPDATE playlists SET cover_path=? WHERE id=?",
+                (cover_path, playlist_id),
+            )
+
+    def delete_playlist(self, playlist_id: int) -> None:
+        with self.connect() as conn:
+            conn.execute("DELETE FROM playlists WHERE id=?", (playlist_id,))
 
     def add_to_playlist(self, playlist_id: int, track_id: int) -> bool:
         with self.connect() as conn:

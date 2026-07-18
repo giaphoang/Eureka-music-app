@@ -5,7 +5,7 @@ from typing import Callable
 
 import httpx
 
-from eureka_client.config import API_BASE_URL, DOWNLOAD_DIR, ensure_dirs
+from eureka_client.config import API_BASE_URL, DOWNLOAD_DIR
 
 
 class UserVisibleAPIError(RuntimeError):
@@ -58,7 +58,7 @@ class MusicAPI:
         track: dict,
         progress: Callable[[int], None] | None = None,
     ) -> Path:
-        ensure_dirs()
+        DOWNLOAD_DIR.mkdir(parents=True, exist_ok=True)
         suffix = Path(track.get("original_name") or "track.mp3").suffix or ".mp3"
         final_path = DOWNLOAD_DIR / f"{int(track['id']):06d}{suffix.lower()}"
         temp_path = final_path.with_suffix(final_path.suffix + ".part")
