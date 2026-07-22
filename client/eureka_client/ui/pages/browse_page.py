@@ -1,15 +1,18 @@
 from __future__ import annotations
 
 from PySide2.QtCore import Signal
-from PySide2.QtWidgets import QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
+from PySide2.QtGui import QIcon
+from PySide2.QtWidgets import QLabel, QVBoxLayout, QWidget
 
 from eureka_client.ui.components.empty_state import EmptyState
 from eureka_client.ui.components.loading_state import LoadingState
 from eureka_client.ui.components.track_table import TrackTable
+from eureka_client.ui.theme import icon_path
 
 
 class BrowsePage(QWidget):
     download_requested = Signal()
+    download_track_requested = Signal(dict)
     previous_page_requested = Signal()
     next_page_requested = Signal()
 
@@ -24,26 +27,20 @@ class BrowsePage(QWidget):
         self.status.setProperty("role", "secondary")
         self.loading = LoadingState("Loading catalog")
         self.table = TrackTable()
+        self.table.set_overflow_enabled(
+            True,
+            text="",
+            icon=QIcon(icon_path("download")),
+            accessible_template="Download {title}",
+            tooltip="Download",
+        )
+        self.table.overflow_requested.connect(lambda track, _button: self.download_track_requested.emit(track))
         self.empty = EmptyState("No tracks found", "Try a different search.")
-
-        controls = QHBoxLayout()
-        self.download_button = QPushButton("Download selected")
-        self.download_button.setProperty("role", "primary")
-        self.download_button.clicked.connect(self.download_requested)
-        self.previous_button = QPushButton("Previous page")
-        self.previous_button.clicked.connect(self.previous_page_requested)
-        self.next_button = QPushButton("Next page")
-        self.next_button.clicked.connect(self.next_page_requested)
-        controls.addWidget(self.download_button)
-        controls.addStretch()
-        controls.addWidget(self.previous_button)
-        controls.addWidget(self.next_button)
 
         layout.addWidget(self.status)
         layout.addWidget(self.loading)
         layout.addWidget(self.table, 1)
         layout.addWidget(self.empty, 1)
-        layout.addLayout(controls)
         self.set_loading(False)
 
     def selected_track(self) -> dict | None:
@@ -62,8 +59,6 @@ class BrowsePage(QWidget):
         start = offset + 1 if total else 0
         end = offset + len(tracks)
         self.status.setText(f"{start}-{end} of {total}")
-        self.previous_button.setEnabled(offset > 0)
-        self.next_button.setEnabled(end < total)
 
     def set_error(self, message: str) -> None:
         self.set_loading(False)
@@ -71,5 +66,3 @@ class BrowsePage(QWidget):
         self.empty.setVisible(True)
         self.empty.set_text("Server unavailable", message)
         self.status.setText("Server unavailable")
-        self.previous_button.setEnabled(False)
-        self.next_button.setEnabled(False)
