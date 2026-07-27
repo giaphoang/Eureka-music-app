@@ -129,6 +129,8 @@ class MainWindow(QMainWindow):
 
         self.browse_page.download_requested.connect(self.download_selected)
         self.browse_page.download_track_requested.connect(self.download_track)
+        self.browse_page.previous_page_requested.connect(self.previous_catalog_page)
+        self.browse_page.next_page_requested.connect(self.next_catalog_page)
         self.downloads_page.add_track_to_playlist_requested.connect(self.add_download_to_playlist)
         self.downloads_page.create_playlist_with_track_requested.connect(self.create_playlist_with_download)
         self.downloads_page.refresh_requested.connect(self.refresh_local)
