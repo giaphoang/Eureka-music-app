@@ -1,6 +1,6 @@
-# Eureka Music App - Mac-local starter
+# Eureka Music App 
 
-A runnable reference implementation for the Eureka Robotics music assignment:
+An Implementation for the Eureka Robotics music app on Ubuntu:
 
 - FastAPI + PostgreSQL server in Docker Compose
 - PySide2 desktop client in a Python virtual environment
@@ -316,13 +316,6 @@ rm -rf "$HOME/Library/Application Support/EurekaMusic"
 
 Or set `EUREKA_DATA_DIR` to a repository-local path during development.
 
-## 7. Recommended five-day build order
-
-- **Day 1:** architecture, Compose, schema, catalog/search, server seed.
-- **Day 2:** client shell, SQLite, catalog browsing, background workers, downloads.
-- **Day 3:** playback controller, seek/state signals, playlist CRUD and ordering.
-- **Day 4:** upload, hard-kill tests, 8,000-track profiling, pagination/model optimization.
-- **Day 5:** tests, diagrams, README, Ubuntu verification, demo video, cleanup.
 
 ## Final Ubuntu target
 
