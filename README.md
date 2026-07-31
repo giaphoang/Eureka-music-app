@@ -352,8 +352,4 @@ pip install -r requirements.txt
 python -m eureka_client.app
 ```
 
-Run the complete 8,000-track test on Ubuntu before recording the submission video.
-
-## 8. Before submission
-
-This starter intentionally favors clarity. Before submitting, add Alembic migrations, structured logging, API integration tests, Qt model tests, and a CI job that runs server tests and static checks.
+More instruction's details in the client's folder README.md
