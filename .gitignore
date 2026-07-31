@@ -19,3 +19,4 @@ recommendation-data/
 *.npy
 *.faiss
 failed_tracks.jsonl
+server/openapi.json

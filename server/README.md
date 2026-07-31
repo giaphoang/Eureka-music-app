@@ -12,6 +12,15 @@ curl http://localhost:8000/health
 
 Open API docs at `http://localhost:8000/docs`.
 
+Export the OpenAPI schema from the repository root:
+
+```bash
+make api-docs
+```
+
+The generated `server/openapi.json` is a local review artifact and should not be
+committed unless the team explicitly wants versioned API snapshots.
+
 Recommendation artifacts and model caches are not committed. Normal server startup keeps
 recommendations disabled unless `EUREKA_RECOMMENDATION_ENABLED=true` is set.
 
