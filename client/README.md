@@ -11,7 +11,7 @@ The client uses a Spotify-inspired PySide2 desktop shell:
 
 The UI refactor evidence is documented under `../docs/ui-refactor/`.
 
-## Important for Apple Silicon Macs
+## Exact PyPI wheel compatibility path on macOS
 
 PySide2 5.15.2.1 on macOS supports Intel x86_64, not Apple Silicon arm64/aarch64. On an Apple Silicon Mac, Python normally runs as arm64, but the available PySide2 macOS wheel was compiled for x86_64. Because those architectures do not match, pip reports that no compatible version exists.
 
@@ -93,52 +93,35 @@ Use `--visible` to show the real window during the run. By default the harness u
 
 The result is acceptable when the summary reports `plateau_status=PASS`, meaning the tail of the run stayed within the configured growth and slope limits.
 
-## Ubuntu desktop-client verification from Apple Silicon using UTM
+## Recommended Ubuntu desktop-client path on Apple Silicon using UTM
 
-Use this path when your main computer is an Apple Silicon Mac and you want to
-verify the required Ubuntu desktop client in a VM.
+Use Ubuntu 22.04 ARM64 in a UTM **Virtualize** VM. Ubuntu provides native ARM64
+PySide2 5.15.2 packages, so x86_64 emulation is unnecessary unless you
+specifically require the exact PyPI `PySide2==5.15.2.1` wheel. See the root
+`README.md` for VM sizing, official Docker installation, FMA sharing, seeding,
+and the optional recommendation setup.
 
 ### 1. Create the Ubuntu VM
 
 1. Install UTM for macOS:
    - Official UTM installation guide: https://docs.getutm.app/installation/macos/
    - UTM download page: https://mac.getutm.app/
-2. Download the Ubuntu 22.04.5 LTS AMD64 desktop ISO:
+2. Download the Ubuntu 22.04 LTS ARM64 desktop image.
    - https://releases.ubuntu.com/22.04/
-   - Choose `ubuntu-22.04.5-desktop-amd64.iso`.
 3. In UTM, create a new virtual machine:
-   - Choose `Emulate`, not `Virtualize`, on Apple Silicon.
+   - Choose `Virtualize`, not `Emulate`, on Apple Silicon.
    - Choose `Linux`.
-   - Architecture: `x86_64`.
-   - System: `Standard PC (Q35 + ICH9, 2009)` if UTM asks.
-   - Memory: at least 4 GB; 8 GB is better if your Mac has enough RAM.
-   - CPU cores: at least 2; 4 is better if available.
-   - Disk: at least 40 GB.
-   - Attach the Ubuntu AMD64 desktop ISO as the boot ISO.
+   - Architecture: `aarch64`/ARM64.
+   - Memory: 8 GB recommended.
+   - Disk: 40 GB recommended.
 4. Start the VM and install Ubuntu Desktop normally.
 5. After installation, shut down the VM, remove/eject the installer ISO, and boot
    into the installed Ubuntu desktop.
-
-Why AMD64 emulation instead of ARM64 virtualization: this client pins
-`PySide2==5.15.2.1`, and the assignment target is Ubuntu with PySide2 5.15.x.
-Using an AMD64 Ubuntu VM best matches the Python wheel and package ecosystem used
-by the documented client setup. ARM64 Ubuntu may be faster in UTM, but dependency
-installation for the pinned PySide2 package may fail there.
 
 UTM also publishes an Ubuntu guide that is useful for general VM creation and
 troubleshooting: https://docs.getutm.app/guides/ubuntu/
 
 ### 2. Prepare Ubuntu inside the VM
-
-Open Terminal in the Ubuntu VM and run:
-
-```bash
-sudo apt update
-sudo apt install -y python3.10 python3.10-venv git curl libgl1 \
-  libxkbcommon-x11-0 libxcb-xinerama0 \
-  gstreamer1.0-plugins-base gstreamer1.0-plugins-good \
-  gstreamer1.0-plugins-ugly gstreamer1.0-libav
-```
 
 Clone the repository, or copy it into the VM using UTM shared folders:
 
@@ -147,21 +130,19 @@ git clone <repository-url>
 cd Eureka-music-app/client
 ```
 
-If you use a UTM shared folder instead of `git clone`, copy the repository to a
-normal Linux directory before creating the virtual environment, for example:
+If you use a UTM shared folder, **do not create `.venv` or run Docker in the
+SPICE WebDAV/GVFS mount**. Copy the repository to a normal Linux directory:
 
 ```bash
 cp -a /media/$USER/<shared-folder>/Eureka-music-app ~/Eureka-music-app
 cd ~/Eureka-music-app/client
 ```
 
-### 3. Install and launch the desktop client
+### 3. Bootstrap and launch the desktop client
 
 ```bash
-python3.10 -m venv .venv
+./scripts/bootstrap_ubuntu_arm64.sh
 source .venv/bin/activate
-python -m pip install --upgrade pip
-pip install -r requirements.txt
 export EUREKA_API_URL=http://localhost:8000
 python -m eureka_client.app
 ```
